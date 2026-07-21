@@ -79,6 +79,29 @@ const Photos = (() => {
   /* ------------------------------------------------------------------
      AJOUT : traite les fichiers choisis (caméra ou galerie)
      ------------------------------------------------------------------ */
+  /* Crée une photo à partir d'un fichier image : compresse, enregistre
+     et RENVOIE la photo créée. Réutilisé par l'ajout classique ET par
+     les plans (pour lier un repère à une nouvelle photo). */
+  async function creerPhotoDepuisFichier(fichier) {
+    const photo = {
+      id: crypto.randomUUID(),
+      dossierId: dossierCourant.id,   // lien vers le dossier parent
+      dateCreation: Date.now(),
+      image: await compresser(fichier, COTE_MAX_IMAGE, QUALITE_IMAGE),
+      vignette: await compresser(fichier, COTE_MAX_VIGNETTE, QUALITE_VIGNETTE),
+      tags: [],          // rempli à l'étape 3
+      observation: '',   // rempli à l'étape 3
+      annotations: [],   // rempli à l'étape 4
+    };
+    await DB.enregistrer('photos', photo);
+
+    // Met à jour la date de modification du dossier (sert au tri d'accueil)
+    dossierCourant.dateModification = Date.now();
+    await DB.enregistrer('dossiers', dossierCourant);
+
+    return photo;
+  }
+
   async function ajouterFichiers(fichiers) {
     if (!fichiers || fichiers.length === 0) return;
 
@@ -86,25 +109,8 @@ const Photos = (() => {
 
     for (const fichier of fichiers) {
       if (!fichier.type.startsWith('image/')) continue; // ignore les non-images
-
-      const photo = {
-        id: crypto.randomUUID(),
-        dossierId: dossierCourant.id,   // lien vers le dossier parent
-        dateCreation: Date.now(),
-        image: await compresser(fichier, COTE_MAX_IMAGE, QUALITE_IMAGE),
-        vignette: await compresser(fichier, COTE_MAX_VIGNETTE, QUALITE_VIGNETTE),
-        tags: [],          // rempli à l'étape 3
-        observation: '',   // rempli à l'étape 3
-        annotations: [],   // rempli à l'étape 4
-      };
-
-      await DB.enregistrer('photos', photo);
+      await creerPhotoDepuisFichier(fichier);
     }
-
-    // Le dossier vient de changer : on met à jour sa date de modification
-    // (c'est elle qui sert au tri de l'écran d'accueil)
-    dossierCourant.dateModification = Date.now();
-    await DB.enregistrer('dossiers', dossierCourant);
 
     indicateurAjout.hidden = true;
     await afficherGrille();
@@ -162,7 +168,31 @@ const Photos = (() => {
     Tags.afficherTagsPhoto(dossierCourant, photo);
     document.getElementById('champ-observation').value = photo.observation || '';
 
+    // Repères de plan pointant vers cette photo (chargement asynchrone)
+    afficherReperesLies(photo);
+
     App.montrerEcran('ecran-photo');
+  }
+
+  /* Affiche les repères de plan qui pointent vers cette photo */
+  async function afficherReperesLies(photo) {
+    const zone = document.getElementById('photo-reperes');
+    const reperes = await Plans.reperesDeLaPhoto(dossierCourant.id, photo.id);
+
+    if (reperes.length === 0) {
+      zone.hidden = true;
+      return;
+    }
+    zone.hidden = false;
+    zone.innerHTML = '<span class="photo-reperes__titre">📍 Repère(s) sur plan :</span>';
+    for (const r of reperes) {
+      const puce = document.createElement('span');
+      puce.className = 'photo-reperes__puce';
+      // Numéro dans une pastille + nom du plan
+      puce.innerHTML = `<span class="photo-reperes__num">${r.numero}</span>`;
+      puce.appendChild(document.createTextNode(' ' + r.nomPlan));
+      zone.appendChild(puce);
+    }
   }
 
   /* ------------------------------------------------------------------
@@ -250,8 +280,20 @@ const Photos = (() => {
       .addEventListener('click', () => dialogueSupprimer.close());
     document.getElementById('btn-confirmer-suppression-photo')
       .addEventListener('click', confirmerSuppressionPhoto);
+
+    // Bouton "Plans du dossier" : ouvre l'écran des plans
+    document.getElementById('btn-ouvrir-plans')
+      .addEventListener('click', () => Plans.ouvrir(dossierCourant));
   }
 
-  return { initialiser, ouvrir };
+  // Fonctions exposées. 'dossierActuel' et 'creerPhotoDepuisFichier'
+  // servent au module Plans (associer un repère à une nouvelle photo).
+  return {
+    initialiser,
+    ouvrir,
+    ouvrirPhoto,
+    creerPhotoDepuisFichier,
+    dossierActuel: () => dossierCourant,
+  };
 
 })();

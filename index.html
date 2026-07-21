@@ -78,6 +78,11 @@
       <!-- Indicateur affiché pendant la compression des photos -->
       <p id="indicateur-ajout" class="indicateur-ajout" hidden>Ajout des photos en cours…</p>
 
+      <!-- Accès aux plans du dossier -->
+      <button id="btn-ouvrir-plans" class="btn btn--secondaire btn--pleine-largeur" type="button">
+        🗺️ Plans du dossier
+      </button>
+
       <!-- Grille de vignettes, remplie par js/photos.js -->
       <ul id="grille-photos" class="grille-photos"></ul>
 
@@ -125,6 +130,9 @@
         <button id="btn-annoter" class="btn btn--principal btn--pleine-largeur btn--large" type="button">
           ✏️ Annoter la photo
         </button>
+
+        <!-- Repères de plan pointant vers cette photo (rempli par photos.js) -->
+        <div id="photo-reperes" class="photo-reperes" hidden></div>
 
         <!-- ----- TAGS ----- -->
         <section class="bloc">
@@ -288,7 +296,7 @@
 
       <!-- Ligne 1 : les outils -->
       <div class="outils__ligne outils__ligne--principale">
-        <button class="outil outil--actif" data-outil="selection" type="button" aria-label="Sélectionner / déplacer" title="Sélectionner">↖</button>
+        <button class="outil outil--actif" data-outil="selection" type="button" aria-label="Sélectionner / déplacer" title="Sélectionner / déplacer">✋</button>
         <button class="outil" data-outil="trace" type="button" aria-label="Dessin libre" title="Dessin libre">✏️</button>
         <button class="outil" data-outil="fleche" type="button" aria-label="Flèche" title="Flèche">↗</button>
         <button class="outil" data-outil="rectangle" type="button" aria-label="Rectangle" title="Rectangle">▭</button>
@@ -312,9 +320,11 @@
 
         <!-- Épaisseur -->
         <div class="reglage reglage--epaisseur">
-          <button class="epaisseur" data-epaisseur="3" type="button" aria-label="Fin">•</button>
-          <button class="epaisseur epaisseur--active" data-epaisseur="6" type="button" aria-label="Moyen">●</button>
-          <button class="epaisseur" data-epaisseur="12" type="button" aria-label="Épais">⬤</button>
+          <button class="epaisseur" data-epaisseur="3" type="button" aria-label="Très fin"><span class="pt-epaisseur" style="--e:3px"></span></button>
+          <button class="epaisseur epaisseur--active" data-epaisseur="6" type="button" aria-label="Fin"><span class="pt-epaisseur" style="--e:6px"></span></button>
+          <button class="epaisseur" data-epaisseur="12" type="button" aria-label="Moyen"><span class="pt-epaisseur" style="--e:11px"></span></button>
+          <button class="epaisseur" data-epaisseur="20" type="button" aria-label="Épais"><span class="pt-epaisseur" style="--e:16px"></span></button>
+          <button class="epaisseur" data-epaisseur="30" type="button" aria-label="Très épais"><span class="pt-epaisseur" style="--e:22px"></span></button>
         </div>
 
         <!-- Style de trait -->
@@ -326,9 +336,130 @@
     </div>
   </section>
   <!-- ================================================================
+       ÉCRAN LISTE DES PLANS d'un dossier
+       ================================================================ -->
+  <section id="ecran-plans" class="ecran">
+
+    <header class="barre">
+      <button id="btn-retour-dossier-2" class="btn-retour" type="button" aria-label="Retour au dossier">←</button>
+      <div class="barre__titres">
+        <h1 class="barre__titre">Plans du dossier</h1>
+        <p id="plans-sous-titre" class="barre__sous-titre"></p>
+      </div>
+    </header>
+
+    <main class="contenu">
+      <button id="btn-importer-plan" class="btn btn--principal btn--pleine-largeur btn--large" type="button">
+        📄 Importer un plan (image ou PDF)
+      </button>
+      <p id="indicateur-plan" class="indicateur-ajout" hidden>Import du plan en cours…</p>
+
+      <ul id="grille-plans" class="grille-plans"></ul>
+
+      <div id="etat-vide-plans" class="etat-vide" hidden>
+        <div class="etat-vide__icone" aria-hidden="true">🗺️</div>
+        <h2 class="etat-vide__titre">Aucun plan</h2>
+        <p class="etat-vide__texte">Importez un plan d'étage, une façade ou un plan d'évacuation pour y localiser vos photos.</p>
+      </div>
+
+      <input id="entree-plan" type="file" accept="image/*,application/pdf" hidden>
+    </main>
+  </section>
+
+  <!-- ================================================================
+       ÉCRAN PLAN INDIVIDUEL : plan + repères
+       ================================================================ -->
+  <section id="ecran-plan" class="ecran ecran--sombre">
+
+    <header class="barre">
+      <button id="btn-retour-plans" class="btn-retour" type="button" aria-label="Retour aux plans">←</button>
+      <div class="barre__titres">
+        <h1 id="plan-titre" class="barre__titre">Plan</h1>
+        <p id="plan-infos" class="barre__sous-titre"></p>
+      </div>
+      <button id="btn-supprimer-plan" class="btn-retour" type="button" aria-label="Supprimer le plan">🗑</button>
+    </header>
+
+    <main class="plan-vue">
+      <!-- Conteneur du plan : l'image + les repères positionnés dessus -->
+      <div id="plan-zone" class="plan-zone">
+        <img id="plan-image" class="plan-image" alt="Plan">
+        <!-- Les repères (pastilles) sont ajoutés ici par plans.js -->
+      </div>
+    </main>
+
+    <!-- Bulle d'aperçu affichée au survol (souris) ou à l'appui long (tactile).
+         Positionnée dynamiquement par plans.js. -->
+    <div id="apercu-repere" class="apercu-repere" hidden>
+      <img id="apercu-repere-img" class="apercu-repere__img" alt="Aperçu de la photo">
+      <div class="apercu-repere__infos">
+        <span id="apercu-repere-num" class="apercu-repere__num"></span>
+        <div id="apercu-repere-remarques" class="apercu-repere__remarques"></div>
+      </div>
+      <button id="apercu-repere-ouvrir" class="apercu-repere__ouvrir" type="button">Ouvrir la photo</button>
+    </div>
+
+    <!-- Barre du bas : mode placement + légende -->
+    <div class="plan-barre">
+      <button id="btn-mode-repere" class="btn btn--principal" type="button">＋ Placer un repère</button>
+      <button id="btn-legende" class="btn btn--secondaire" type="button">Légende</button>
+    </div>
+  </section>
+
+  <!-- FENÊTRE : choix du type de repère -->
+  <dialog id="dialogue-repere" class="dialogue">
+    <div class="dialogue__contenu">
+      <h2 class="dialogue__titre">Associer ce repère à…</h2>
+      <div class="repere-choix">
+        <button id="btn-repere-existante" class="btn btn--principal btn--pleine-largeur btn--large" type="button">
+          🖼️ Une photo existante
+        </button>
+        <button id="btn-repere-nouvelle" class="btn btn--secondaire btn--pleine-largeur btn--large" type="button">
+          📷 Prendre une nouvelle photo
+        </button>
+        <button id="btn-repere-annuler" class="btn btn--secondaire btn--pleine-largeur" type="button">
+          Annuler
+        </button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- FENÊTRE : choisir une photo existante à associer -->
+  <dialog id="dialogue-choix-photo" class="dialogue dialogue--large">
+    <div class="dialogue__contenu">
+      <h2 class="dialogue__titre">Choisir une photo</h2>
+      <ul id="choix-photo-grille" class="grille-photos"></ul>
+      <div class="dialogue__actions">
+        <button id="btn-fermer-choix-photo" class="btn btn--secondaire">Annuler</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- FENÊTRE : légende (remarques et couleurs) -->
+  <dialog id="dialogue-legende" class="dialogue">
+    <div class="dialogue__contenu">
+      <h2 class="dialogue__titre">Légende des repères</h2>
+      <div id="legende-liste" class="legende-liste"></div>
+      <div class="dialogue__actions">
+        <button id="btn-fermer-legende" class="btn btn--principal">Fermer</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- FENÊTRE : confirmation suppression plan -->
+  <dialog id="dialogue-supprimer-plan" class="dialogue">
+    <div class="dialogue__contenu">
+      <h2 class="dialogue__titre">Supprimer ce plan ?</h2>
+      <p class="dialogue__texte">Le plan et ses repères seront supprimés. Les photos associées, elles, ne seront pas supprimées.</p>
+      <div class="dialogue__actions">
+        <button id="btn-annuler-suppr-plan" class="btn btn--secondaire">Annuler</button>
+        <button id="btn-confirmer-suppr-plan" class="btn btn--danger">Supprimer</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- ================================================================
        FENÊTRE : gestion des tags du dossier
-       L'opérateur crée ici la liste des tags (Localisation et Remarque)
-       qu'il pourra ensuite cocher sur chaque photo.
        ================================================================ -->
   <dialog id="dialogue-tags" class="dialogue dialogue--large">
     <div class="dialogue__contenu">
@@ -363,6 +494,9 @@
 
   <!-- Les scripts sont chargés dans l'ordre des dépendances :
        db.js → (geo, camera, tags, dictee) → photos → dossiers → app -->
+  <!-- Bibliothèque pdf.js (locale, pour lire les plans PDF hors ligne) -->
+  <script src="lib/pdf.min.js"></script>
+
   <script src="js/db.js"></script>
   <script src="js/geo.js"></script>
   <script src="js/camera.js"></script>
@@ -370,6 +504,7 @@
   <script src="js/tags.js"></script>
   <script src="js/dictee.js"></script>
   <script src="js/annotate.js"></script>
+  <script src="js/plans.js"></script>
   <script src="js/photos.js"></script>
   <script src="js/dossiers.js"></script>
   <script src="js/app.js"></script>
