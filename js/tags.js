@@ -64,8 +64,8 @@ const Tags = (() => {
     dialogue.querySelectorAll('.onglet').forEach((o) => {
       o.classList.toggle('onglet--actif', o.dataset.type === typeActif);
     });
-    // Les suggestions de bibliothèque ne concernent que les remarques
-    zoneSuggestions.hidden = (typeActif !== 'remarque');
+    // La zone de suggestions sert désormais aux DEUX types (son contenu
+    // et sa visibilité réelle sont gérés par afficherSuggestions).
     champNouveau.placeholder = (typeActif === 'localisation')
       ? 'Ex. : Logement 12 – Cuisine' : 'Ex. : Amiante';
   }
@@ -89,33 +89,49 @@ const Tags = (() => {
       listeDossier.appendChild(puce);
     }
 
-    // Suggestions de la bibliothèque commune (pour les remarques)
-    if (typeActif === 'remarque') await afficherSuggestions();
+    // Suggestions (prédéfinis + bibliothèque commune pour les remarques)
+    await afficherSuggestions();
   }
 
-  /* Affiche les remarques de la bibliothèque pas encore dans le dossier */
+  /* Affiche les suggestions du type actif qui ne sont pas déjà dans le
+     dossier. Pour "localisation" : la liste prédéfinie. Pour "remarque" :
+     la liste prédéfinie FUSIONNÉE avec la bibliothèque commune (les
+     remarques créées lors des précédents dossiers), sans doublon. */
   async function afficherSuggestions() {
-    const bibliotheque = await chargerBibliotheque();
+    // 1. Point de départ : la liste prédéfinie du type actif
+    let libellesSuggeres = [...(Predefinis[typeActif] || [])];
+
+    // 2. Pour les remarques, on ajoute la bibliothèque commune
+    if (typeActif === 'remarque') {
+      const bibliotheque = await chargerBibliotheque();
+      for (const r of bibliotheque) {
+        const dejaListe = libellesSuggeres.some(
+          (l) => l.toLowerCase() === r.libelle.toLowerCase());
+        if (!dejaListe) libellesSuggeres.push(r.libelle);
+      }
+    }
+
+    // 3. On retire celles déjà présentes dans le dossier
     const dejaDansDossier = (dossierCourant.tags || [])
-      .filter((t) => t.type === 'remarque')
+      .filter((t) => t.type === typeActif)
       .map((t) => t.libelle.toLowerCase());
 
-    listeSuggestions.innerHTML = '';
-    const aProposer = bibliotheque.filter(
-      (r) => !dejaDansDossier.includes(r.libelle.toLowerCase()));
+    const aProposer = libellesSuggeres.filter(
+      (l) => !dejaDansDossier.includes(l.toLowerCase()));
 
+    listeSuggestions.innerHTML = '';
     if (aProposer.length === 0) {
       zoneSuggestions.hidden = true;
       return;
     }
     zoneSuggestions.hidden = false;
 
-    for (const remarque of aProposer) {
+    for (const libelle of aProposer) {
       const puce = document.createElement('button');
       puce.type = 'button';
       puce.className = 'tag-puce tag-puce--suggestion';
-      puce.textContent = '+ ' + remarque.libelle;
-      puce.addEventListener('click', () => creerTag(remarque.libelle));
+      puce.textContent = '+ ' + libelle;
+      puce.addEventListener('click', () => creerTag(libelle));
       listeSuggestions.appendChild(puce);
     }
   }
