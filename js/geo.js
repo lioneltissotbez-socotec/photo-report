@@ -62,8 +62,29 @@ const Geo = (() => {
     if (!reponse.ok) throw new Error('Service d\'adresse indisponible.');
 
     const donnees = await reponse.json();
-    // 'display_name' est l'adresse complète formatée par Nominatim
-    return donnees.display_name || '';
+
+    // Nominatim renvoie 'display_name' (adresse complète et verbeuse) ET
+    // un objet 'address' avec les champs séparés. On reconstruit une
+    // adresse courte à partir de ces champs : "N° rue, CP ville".
+    const a = donnees.address || {};
+
+    // La ville peut porter des noms de champ différents selon le lieu
+    // (city en ville, town en bourg, village en campagne...) : on prend
+    // le premier disponible.
+    const ville = a.city || a.town || a.village || a.municipality || '';
+
+    // Le nom de voie : 'road' en général, sinon la piétonne/place.
+    const rue = a.road || a.pedestrian || a.square || '';
+
+    // On assemble : "6 Rue Gustave Courbet" puis "25300 Pontarlier",
+    // en ignorant proprement les morceaux manquants.
+    const ligneRue = [a.house_number, rue].filter(Boolean).join(' ');
+    const ligneVille = [a.postcode, ville].filter(Boolean).join(' ');
+    const adresseCourte = [ligneRue, ligneVille].filter(Boolean).join(', ');
+
+    // Si la reconstruction échoue (lieu sans détails), on retombe sur
+    // l'adresse complète plutôt que de ne rien renvoyer.
+    return adresseCourte || donnees.display_name || '';
   }
 
   /* ------------------------------------------------------------------
