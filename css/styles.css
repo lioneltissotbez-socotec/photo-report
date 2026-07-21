@@ -1298,3 +1298,77 @@ button:focus-visible, input:focus-visible {
 .photo-gps__champ input { width:100%; min-height:44px; box-sizing:border-box; border:1px solid #B8C5D1; border-radius:8px; padding:9px 10px; font:inherit; color:#14283A; background:#FFF; }
 .photo-gps__etat { margin:9px 0 0; font-size:.82rem; color:var(--encre-douce); line-height:1.35; }
 @media (max-width:520px) { .photo-gps__champs { grid-template-columns:1fr; } }
+
+/* Version 2.1.4 — cartes de missions adaptatives sur mobile */
+.liste-dossiers,
+.dossier-carte {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.dossier-carte > * {
+  min-width: 0;
+}
+
+@media (max-width: 600px) {
+  #ecran-accueil .contenu {
+    width: 100%;
+    max-width: 100%;
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .liste-dossiers {
+    grid-template-columns: minmax(0, 1fr);
+    overflow: visible;
+  }
+
+  .dossier-carte {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "infos supprimer"
+      "compteur supprimer";
+    align-items: center;
+    column-gap: 8px;
+    row-gap: 8px;
+    padding: 13px 10px 13px 13px;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .dossier-carte__infos {
+    grid-area: infos;
+    width: 100%;
+    max-width: 100%;
+    overflow: hidden;
+  }
+
+  .dossier-carte__nom,
+  .dossier-carte__detail {
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    text-overflow: clip;
+  }
+
+  .dossier-carte__nom {
+    line-height: 1.25;
+  }
+
+  .dossier-carte__detail {
+    line-height: 1.35;
+  }
+
+  .dossier-carte__compteur {
+    grid-area: compteur;
+    justify-self: start;
+    max-width: 100%;
+  }
+
+  .dossier-carte__supprimer {
+    grid-area: supprimer;
+    align-self: center;
+  }
+}

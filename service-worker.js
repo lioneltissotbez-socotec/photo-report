@@ -1,5 +1,5 @@
 /* Service worker PWA : cache statique maîtrisé et cache tuiles limité. */
-const VERSION_APP = '2.1.3';
+const VERSION_APP = '2.1.4';
 const CACHE_APP = `reportage-photo-app-${VERSION_APP}`;
 const CACHE_TUILES = `reportage-photo-tuiles-${VERSION_APP}`;
 const LIMITE_TUILES = 150;
