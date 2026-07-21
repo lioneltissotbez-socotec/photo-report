@@ -178,6 +178,13 @@
                placeholder="Ex. : 12 rue de la Paix, Versailles" autocomplete="off">
       </label>
 
+      <!-- Bouton de géolocalisation : récupère la position GPS et tente
+           de la convertir en adresse (si connecté à internet) -->
+      <button type="button" id="btn-localiser" class="btn btn--secondaire btn--pleine-largeur">
+        📍 Me localiser (GPS)
+      </button>
+      <p id="localisation-etat" class="localisation-etat" hidden></p>
+
       <div class="dialogue__actions">
         <button type="button" id="btn-annuler-dossier" class="btn btn--secondaire">Annuler</button>
         <button type="submit" class="btn btn--principal">Créer le dossier</button>
@@ -218,6 +225,7 @@
   <!-- Les scripts sont chargés dans l'ordre des dépendances :
        db.js (base de données) → photos.js → dossiers.js → app.js -->
   <script src="js/db.js"></script>
+  <script src="js/geo.js"></script>
   <script src="js/camera.js"></script>
   <script src="js/photos.js"></script>
   <script src="js/dossiers.js"></script>

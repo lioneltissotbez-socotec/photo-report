@@ -26,7 +26,13 @@
 /* ------------------------------ Base ------------------------------- */
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
-html, body { height: 100%; }
+html, body {
+  height: 100%;
+  /* Empêche tout défilement horizontal : aucun élément ne peut
+     déborder la largeur de l'écran (cause du "scroll de côté"). */
+  max-width: 100%;
+  overflow-x: hidden;
+}
 
 body {
   /* Polices système : Segoe UI sur la Surface, Roboto sur Android, etc. */
@@ -41,11 +47,23 @@ body {
 .ecran { display: none; min-height: 100dvh; flex-direction: column; }
 .ecran--visible { display: flex; }
 
+/* Écrans caméra et photo : hauteur EXACTE de la zone visible (100dvh),
+   surtout pas plus. Ainsi la barre de capture reste toujours à l'écran
+   sans avoir à faire défiler. La zone centrale, elle, se comprime. */
+#ecran-camera.ecran--visible,
+#ecran-photo.ecran--visible {
+  height: 100dvh;
+  min-height: 0;
+  max-height: 100dvh;
+  overflow: hidden;
+}
+
 /* --------------------------- Barre du haut ------------------------- */
 .barre {
   display: flex;
   align-items: center;
   gap: 12px;
+  flex-shrink: 0;   /* garde sa hauteur dans les écrans à hauteur fixe */
   background: var(--bleu-nuit);
   color: #FFFFFF;
   padding: 14px 18px;
@@ -205,6 +223,19 @@ body {
 .fab:active { transform: scale(0.97); }
 .fab__plus { font-size: 1.5rem; line-height: 1; }
 
+/* Sur petit écran (téléphone), le bouton flottant se réduit à un rond
+   avec le "+" seul : il ne risque plus de déborder ni de gêner. */
+@media (max-width: 480px) {
+  .fab {
+    padding: 0;
+    width: 60px;
+    height: 60px;
+    justify-content: center;
+    font-size: 0; /* masque le texte "Nouveau dossier" */
+  }
+  .fab__plus { font-size: 2rem; }
+}
+
 /* --------------------------- Dialogues ----------------------------- */
 .dialogue {
   border: none;
@@ -282,6 +313,22 @@ body {
 .btn--secondaire { background: #E4EAF0; color: var(--bleu-nuit); }
 .btn--danger     { background: var(--rouge-danger); color: #FFFFFF; }
 
+/* Bouton occupant toute la largeur (ex : "Me localiser" dans le formulaire) */
+.btn--pleine-largeur { width: 100%; margin-bottom: 8px; }
+
+/* Message d'état sous le bouton de localisation */
+.localisation-etat {
+  font-size: 0.85rem;
+  line-height: 1.4;
+  color: var(--encre-douce);
+  margin-bottom: 16px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: #F0F4F8;
+}
+.localisation-etat--ok { color: #1E6B3A; background: #E8F5EC; }
+.localisation-etat--erreur { color: var(--rouge-danger); background: #FBEAE8; }
+
 /* ====================================================================
    ÉTAPE 2 — Photos
    ==================================================================== */
@@ -341,10 +388,12 @@ body {
 
 .visionneuse {
   flex: 1;
+  min-height: 0;   /* même raison : la zone image se comprime au besoin */
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 12px;
+  overflow: hidden;
 }
 
 .visionneuse__image {
@@ -362,6 +411,8 @@ body {
 
 .camera {
   flex: 1;
+  min-height: 0;   /* autorise la zone à se comprimer si l'écran est court,
+                      sinon la barre de capture serait poussée hors de vue */
   display: flex;
   align-items: center;
   justify-content: center;
@@ -386,6 +437,7 @@ body {
 
 /* Barre du bas avec le déclencheur, façon appareil photo natif */
 .camera__barre-bas {
+  flex-shrink: 0;   /* ne rétrécit jamais : toujours visible en bas */
   display: flex;
   justify-content: center;
   align-items: center;

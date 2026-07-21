@@ -19,6 +19,54 @@ const Dossiers = (() => {
   // l'utilisateur confirme ou annule dans la fenêtre de confirmation)
   let idASupprimer = null;
 
+  // Mémorise les coordonnées GPS récupérées via le bouton "Me localiser",
+  // en attendant la validation du formulaire
+  let coordonneesGPS = null;
+
+  /* ------------------------------------------------------------------
+     GÉOLOCALISATION : clic sur "Me localiser (GPS)"
+     Récupère la position, remplit le champ adresse si possible, et
+     mémorise les coordonnées pour les enregistrer avec le dossier.
+     ------------------------------------------------------------------ */
+  async function localiser() {
+    const bouton = document.getElementById('btn-localiser');
+    const etat = document.getElementById('localisation-etat');
+
+    bouton.disabled = true;
+    etat.hidden = false;
+    etat.textContent = 'Recherche de la position…';
+    etat.className = 'localisation-etat';
+
+    try {
+      const resultat = await Geo.localiser();
+      coordonneesGPS = {
+        latitude: resultat.latitude,
+        longitude: resultat.longitude,
+        precision: resultat.precision,
+      };
+
+      // Si une adresse a été trouvée (donc en ligne), on remplit le champ
+      if (resultat.adresse) {
+        document.getElementById('champ-adresse').value = resultat.adresse;
+        etat.textContent = `Position trouvée (précision ~${Math.round(resultat.precision)} m).`;
+        etat.classList.add('localisation-etat--ok');
+      } else {
+        // Hors ligne : coordonnées gardées, adresse à compléter à la main
+        etat.textContent =
+          `Coordonnées enregistrées : ${resultat.latitude.toFixed(5)}, ${resultat.longitude.toFixed(5)}. `
+          + `Adresse indisponible hors ligne — à compléter manuellement.`;
+        etat.classList.add('localisation-etat--ok');
+      }
+    } catch (erreur) {
+      // Refus de permission, GPS indisponible, délai dépassé…
+      etat.textContent =
+        "Impossible d'obtenir la position. Vérifiez que la localisation est autorisée.";
+      etat.classList.add('localisation-etat--erreur');
+    } finally {
+      bouton.disabled = false;
+    }
+  }
+
   /* ------------------------------------------------------------------
      AFFICHAGE : reconstruit la liste des dossiers à l'écran.
      Appelée au démarrage et après chaque création/suppression.
@@ -91,6 +139,8 @@ const Dossiers = (() => {
       nom: document.getElementById('champ-nom').value.trim(),
       reference: document.getElementById('champ-reference').value.trim(),
       adresse: document.getElementById('champ-adresse').value.trim(),
+      // Coordonnées GPS si l'opérateur a utilisé "Me localiser" (sinon null)
+      gps: coordonneesGPS,
       // Tags du dossier : rempli à l'étape 3.
       // Chaque tag aura la forme { id, libelle, type: 'localisation' | 'remarque' }
       tags: [],
@@ -101,6 +151,8 @@ const Dossiers = (() => {
     await DB.enregistrer('dossiers', dossier);
 
     formulaire.reset();
+    coordonneesGPS = null;                                    // remet à zéro pour le prochain dossier
+    document.getElementById('localisation-etat').hidden = true;
     dialogueNouveau.close();
     await afficherListe();
   }
@@ -145,12 +197,22 @@ const Dossiers = (() => {
   function initialiser() {
     document.getElementById('btn-nouveau-dossier')
       .addEventListener('click', () => {
+        coordonneesGPS = null;                                     // repart propre
+        document.getElementById('localisation-etat').hidden = true;
         dialogueNouveau.showModal();
         document.getElementById('champ-nom').focus();
       });
 
+    document.getElementById('btn-localiser')
+      .addEventListener('click', localiser);
+
     document.getElementById('btn-annuler-dossier')
-      .addEventListener('click', () => { formulaire.reset(); dialogueNouveau.close(); });
+      .addEventListener('click', () => {
+        formulaire.reset();
+        coordonneesGPS = null;
+        document.getElementById('localisation-etat').hidden = true;
+        dialogueNouveau.close();
+      });
 
     formulaire.addEventListener('submit', creerDossier);
 

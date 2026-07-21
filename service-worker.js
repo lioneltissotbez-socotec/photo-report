@@ -15,7 +15,7 @@
    garderaient l'ancienne version en cache).
    ==================================================================== */
 
-const VERSION_CACHE = 'reportage-photo-v4';
+const VERSION_CACHE = 'reportage-photo-v5';
 
 const FICHIERS_APP = [
   './',
@@ -23,6 +23,7 @@ const FICHIERS_APP = [
   './manifest.json',
   './css/styles.css',
   './js/db.js',
+  './js/geo.js',
   './js/camera.js',
   './js/photos.js',
   './js/dossiers.js',
