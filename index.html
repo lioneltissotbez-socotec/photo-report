@@ -1,64 +1,226 @@
-/* ====================================================================
-   app.js — Chef d'orchestre de l'application
-   --------------------------------------------------------------------
-   RÔLE : navigation entre les écrans, indicateur hors ligne,
-   démarrage de l'app et enregistrement du service worker (PWA).
-   ==================================================================== */
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <!-- viewport-fit=cover : occupe tout l'écran sur mobile, user-scalable=no : évite les zooms accidentels pendant l'annotation -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#0F2C4A">
+  <title>Reportage Photo — Socotec Diagnostic</title>
 
-const App = (() => {
+  <!-- Fiche d'identité de la PWA (nom, icônes, installation sur l'écran d'accueil) -->
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
 
-  /* ------------------------------------------------------------------
-     NAVIGATION : un seul écran visible à la fois.
-     Principe : toutes les <section class="ecran"> sont masquées par
-     le CSS ; on ajoute la classe .ecran--visible à celle demandée.
-     ------------------------------------------------------------------ */
-  function montrerEcran(idEcran) {
-    document.querySelectorAll('.ecran').forEach((ecran) => {
-      ecran.classList.toggle('ecran--visible', ecran.id === idEcran);
-    });
-    window.scrollTo(0, 0); // repart en haut de page à chaque changement
-  }
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
 
-  /* ------------------------------------------------------------------
-     INDICATEUR RÉSEAU : affiche la pastille "Hors ligne" dans la
-     barre du haut. Purement informatif : l'app fonctionne pareil.
-     ------------------------------------------------------------------ */
-  function surveillerReseau() {
-    const pastille = document.getElementById('indicateur-reseau');
-    const mettreAJour = () => { pastille.hidden = navigator.onLine; };
+  <!-- ================================================================
+       ÉCRAN 1 : ACCUEIL — liste des dossiers
+       Un seul fichier HTML contient tous les écrans ; app.js affiche
+       ou masque chaque <section class="ecran"> selon la navigation.
+       ================================================================ -->
+  <section id="ecran-accueil" class="ecran ecran--visible">
 
-    window.addEventListener('online', mettreAJour);
-    window.addEventListener('offline', mettreAJour);
-    mettreAJour(); // état initial au démarrage
-  }
+    <header class="barre">
+      <div class="barre__titres">
+        <h1 class="barre__titre">Reportage Photo</h1>
+        <p class="barre__sous-titre">Socotec Diagnostic</p>
+      </div>
+      <span id="indicateur-reseau" class="pastille pastille--horsligne" hidden>Hors ligne</span>
+    </header>
 
-  /* ------------------------------------------------------------------
-     SERVICE WORKER : le "gardien hors ligne" de la PWA.
-     Il intercepte les requêtes réseau et sert les fichiers depuis
-     son cache quand il n'y a pas de connexion (voir service-worker.js).
-     ------------------------------------------------------------------ */
-  function enregistrerServiceWorker() {
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('service-worker.js')
-        .catch((erreur) => console.error('Service worker non enregistré :', erreur));
-    }
-  }
+    <main class="contenu">
+      <!-- Liste des dossiers, remplie par js/dossiers.js -->
+      <ul id="liste-dossiers" class="liste-dossiers"></ul>
 
-  /* ------------------------------------------------------------------
-     DÉMARRAGE
-     ------------------------------------------------------------------ */
-  async function demarrer() {
-    Dossiers.initialiser();
-    Photos.initialiser();
-    Camera.initialiser();
-    await Dossiers.afficherListe();
-    surveillerReseau();
-    enregistrerServiceWorker();
-  }
+      <!-- État vide : affiché uniquement quand il n'y a aucun dossier -->
+      <div id="etat-vide" class="etat-vide" hidden>
+        <div class="etat-vide__icone" aria-hidden="true">📁</div>
+        <h2 class="etat-vide__titre">Aucun dossier pour l'instant</h2>
+        <p class="etat-vide__texte">Créez votre premier dossier pour démarrer un reportage photo.</p>
+      </div>
+    </main>
 
-  // Lance l'app une fois le HTML entièrement chargé
-  document.addEventListener('DOMContentLoaded', demarrer);
+    <!-- Bouton d'action principal (FAB), toujours visible en bas à droite -->
+    <button id="btn-nouveau-dossier" class="fab" type="button">
+      <span class="fab__plus" aria-hidden="true">+</span> Nouveau dossier
+    </button>
+  </section>
 
-  return { montrerEcran };
+  <!-- ================================================================
+       ÉCRAN 2 : DOSSIER — contenu d'un dossier
+       (les photos, tags et plans arriveront aux étapes suivantes)
+       ================================================================ -->
+  <section id="ecran-dossier" class="ecran">
 
-})();
+    <header class="barre">
+      <button id="btn-retour-accueil" class="btn-retour" type="button" aria-label="Retour à l'accueil">←</button>
+      <div class="barre__titres">
+        <h1 id="dossier-titre" class="barre__titre">Dossier</h1>
+        <p id="dossier-infos" class="barre__sous-titre"></p>
+      </div>
+    </header>
+
+    <main class="contenu">
+
+      <!-- Barre d'actions : les deux façons d'ajouter des photos -->
+      <div class="barre-actions">
+        <button id="btn-prendre-photo" class="btn btn--principal btn--large" type="button">
+          📷 Prendre une photo
+        </button>
+        <button id="btn-importer-photos" class="btn btn--secondaire btn--large" type="button">
+          🖼️ Importer
+        </button>
+      </div>
+
+      <!-- Indicateur affiché pendant la compression des photos -->
+      <p id="indicateur-ajout" class="indicateur-ajout" hidden>Ajout des photos en cours…</p>
+
+      <!-- Grille de vignettes, remplie par js/photos.js -->
+      <ul id="grille-photos" class="grille-photos"></ul>
+
+      <!-- État vide : affiché quand le dossier n'a aucune photo -->
+      <div id="etat-vide-photos" class="etat-vide" hidden>
+        <div class="etat-vide__icone" aria-hidden="true">📷</div>
+        <h2 class="etat-vide__titre">Aucune photo</h2>
+        <p class="etat-vide__texte">Prenez une photo ou importez-en depuis la galerie.</p>
+      </div>
+
+      <!-- Champs de fichier invisibles, déclenchés par les boutons.
+           - entree-galerie : import multiple depuis la galerie/l'explorateur
+           - entree-camera-secours : utilisé UNIQUEMENT si getUserMedia
+             échoue (pas de caméra, permission refusée). Sur mobile,
+             capture="environment" ouvre alors la caméra native. -->
+      <input id="entree-galerie" type="file" accept="image/*" multiple hidden>
+      <input id="entree-camera-secours" type="file" accept="image/*" capture="environment" hidden>
+    </main>
+  </section>
+
+  <!-- ================================================================
+       ÉCRAN 3 : PHOTO — visionneuse plein écran
+       (les tags, observations et l'annotation arriveront aux étapes 3 et 4)
+       ================================================================ -->
+  <section id="ecran-photo" class="ecran ecran--sombre">
+
+    <header class="barre">
+      <button id="btn-retour-dossier" class="btn-retour" type="button" aria-label="Retour au dossier">←</button>
+      <div class="barre__titres">
+        <h1 id="photo-titre" class="barre__titre">Photo</h1>
+        <p id="photo-date" class="barre__sous-titre"></p>
+      </div>
+      <button id="btn-supprimer-photo" class="btn-retour" type="button" aria-label="Supprimer la photo">🗑</button>
+    </header>
+
+    <main class="visionneuse">
+      <img id="photo-pleine" class="visionneuse__image" alt="Photo du reportage">
+    </main>
+  </section>
+
+  <!-- ================================================================
+       ÉCRAN CAMÉRA : prise de vue en direct (getUserMedia)
+       Fonctionne sur Surface Pro comme sur téléphone. Le flux de la
+       caméra s'affiche dans une <video>, et "Capturer" fige l'image
+       courante sur un <canvas> invisible pour l'enregistrer.
+       ================================================================ -->
+  <section id="ecran-camera" class="ecran ecran--camera">
+
+    <header class="barre">
+      <button id="btn-fermer-camera" class="btn-retour" type="button" aria-label="Fermer la caméra">←</button>
+      <div class="barre__titres">
+        <h1 class="barre__titre">Prendre une photo</h1>
+      </div>
+      <!-- Bouton pour basculer entre caméra avant / arrière -->
+      <button id="btn-basculer-camera" class="btn-retour" type="button" aria-label="Changer de caméra">🔄</button>
+    </header>
+
+    <main class="camera">
+      <!-- autoplay + playsinline : lance le flux sans plein écran forcé -->
+      <video id="camera-flux" class="camera__flux" autoplay playsinline muted></video>
+
+      <!-- Message affiché si la caméra est inaccessible -->
+      <p id="camera-erreur" class="camera__erreur" hidden></p>
+    </main>
+
+    <!-- Barre de capture en bas -->
+    <div class="camera__barre-bas">
+      <button id="btn-capturer" class="camera__declencheur" type="button" aria-label="Capturer">
+        <span class="camera__declencheur-anneau"></span>
+      </button>
+    </div>
+  </section>
+
+  <!-- ================================================================
+       FENÊTRE : création d'un dossier
+       <dialog> est un élément HTML natif : il gère tout seul
+       l'ouverture (showModal), la fermeture et le fond grisé.
+       ================================================================ -->
+  <dialog id="dialogue-nouveau-dossier" class="dialogue">
+    <form id="formulaire-dossier" method="dialog" class="dialogue__contenu">
+      <h2 class="dialogue__titre">Nouveau dossier</h2>
+
+      <label class="champ">
+        <span class="champ__etiquette">Nom du dossier *</span>
+        <input id="champ-nom" name="nom" type="text" required
+               placeholder="Ex. : Résidence Les Tilleuls" autocomplete="off">
+      </label>
+
+      <label class="champ">
+        <span class="champ__etiquette">Référence interne</span>
+        <input id="champ-reference" name="reference" type="text"
+               placeholder="Ex. : SOC-2026-0142" autocomplete="off">
+      </label>
+
+      <label class="champ">
+        <span class="champ__etiquette">Adresse du site</span>
+        <input id="champ-adresse" name="adresse" type="text"
+               placeholder="Ex. : 12 rue de la Paix, Versailles" autocomplete="off">
+      </label>
+
+      <div class="dialogue__actions">
+        <button type="button" id="btn-annuler-dossier" class="btn btn--secondaire">Annuler</button>
+        <button type="submit" class="btn btn--principal">Créer le dossier</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- ================================================================
+       FENÊTRE : confirmation de suppression
+       ================================================================ -->
+  <dialog id="dialogue-supprimer" class="dialogue">
+    <div class="dialogue__contenu">
+      <h2 class="dialogue__titre">Supprimer ce dossier ?</h2>
+      <p id="supprimer-texte" class="dialogue__texte">
+        Le dossier et toutes ses photos seront définitivement supprimés de l'appareil.
+      </p>
+      <div class="dialogue__actions">
+        <button type="button" id="btn-annuler-suppression" class="btn btn--secondaire">Annuler</button>
+        <button type="button" id="btn-confirmer-suppression" class="btn btn--danger">Supprimer</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- ================================================================
+       FENÊTRE : confirmation de suppression d'une photo
+       ================================================================ -->
+  <dialog id="dialogue-supprimer-photo" class="dialogue">
+    <div class="dialogue__contenu">
+      <h2 class="dialogue__titre">Supprimer cette photo ?</h2>
+      <p class="dialogue__texte">La photo sera définitivement supprimée de l'appareil.</p>
+      <div class="dialogue__actions">
+        <button type="button" id="btn-annuler-suppression-photo" class="btn btn--secondaire">Annuler</button>
+        <button type="button" id="btn-confirmer-suppression-photo" class="btn btn--danger">Supprimer</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- Les scripts sont chargés dans l'ordre des dépendances :
+       db.js (base de données) → photos.js → dossiers.js → app.js -->
+  <script src="js/db.js"></script>
+  <script src="js/camera.js"></script>
+  <script src="js/photos.js"></script>
+  <script src="js/dossiers.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
