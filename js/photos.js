@@ -145,7 +145,10 @@ const Photos = (() => {
   function ouvrirPhoto(photo) {
     photoCourante = photo;
 
-    const url = URL.createObjectURL(photo.image);
+    // Affiche l'aperçu annoté s'il existe (photo + annotations), sinon
+    // l'image d'origine. L'original n'est jamais modifié.
+    const source = photo.apercu || photo.image;
+    const url = URL.createObjectURL(source);
     urlsTemporaires.push(url);
     document.getElementById('photo-pleine').src = url;
 
@@ -202,6 +205,19 @@ const Photos = (() => {
       .addEventListener('click', () => {
         Dictee.arreter();
         App.montrerEcran('ecran-dossier');
+      });
+
+    // Bouton "Annoter" : ouvre l'éditeur ; au retour, on rouvre la
+    // photo pour afficher le nouvel aperçu annoté
+    document.getElementById('btn-annoter')
+      .addEventListener('click', () => {
+        Dictee.arreter();
+        if (photoCourante) {
+          Annotate.ouvrir(photoCourante, (photoMaj) => {
+            photoCourante = photoMaj;
+            ouvrirPhoto(photoMaj);   // rafraîchit l'aperçu
+          });
+        }
       });
 
     // Bouton "Gérer les tags" : ouvre la fenêtre de gestion, puis

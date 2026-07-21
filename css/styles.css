@@ -678,6 +678,161 @@ body {
   background: var(--jaune-chantier);
 }
 
+/* ====================================================================
+   ÉTAPE 4 — Éditeur d'annotation
+   ==================================================================== */
+.ecran--annotation { background: #10161C; }
+
+/* L'écran d'annotation occupe exactement la hauteur visible :
+   barre haut + zone de dessin extensible + barre d'outils en bas */
+#ecran-annotation.ecran--visible {
+  height: 100dvh;
+  min-height: 0;
+  max-height: 100dvh;
+  overflow: hidden;
+}
+
+.barre--annotation {
+  background: #060A0E;
+  justify-content: space-between;
+}
+
+.annot-historique { display: flex; gap: 8px; }
+
+.btn-annot-hist {
+  width: 44px;
+  height: 44px;
+  border: none;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #FFFFFF;
+  font-size: 1.3rem;
+  cursor: pointer;
+}
+.btn-annot-hist:disabled { opacity: 0.35; cursor: default; }
+
+.btn-annot-ok {
+  border: none;
+  border-radius: 10px;
+  background: var(--jaune-chantier);
+  color: var(--bleu-nuit);
+  font-weight: 800;
+  font-size: 0.95rem;
+  font-family: inherit;
+  padding: 0 16px;
+  height: 44px;
+  cursor: pointer;
+}
+
+/* Zone de dessin : centre le canvas, fond sombre */
+.zone-dessin {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  padding: 8px;
+}
+
+.canvas-annotation {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  /* touch-action:none = indispensable : empêche le navigateur de faire
+     défiler/zoomer pendant qu'on dessine au doigt */
+  touch-action: none;
+  background: #000000;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+}
+
+/* --------------------------- Barre d'outils ------------------------ */
+.outils {
+  flex-shrink: 0;
+  background: #1A2129;
+  padding: 10px 8px;
+  padding-bottom: calc(10px + env(safe-area-inset-bottom));
+}
+
+.outils__ligne {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.outils__ligne--principale { margin-bottom: 10px; }
+
+/* Boutons d'outils */
+.outil {
+  width: 46px;
+  height: 46px;
+  border: 2px solid transparent;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.10);
+  color: #FFFFFF;
+  font-size: 1.25rem;
+  cursor: pointer;
+}
+.outil--actif {
+  background: var(--bleu-action);
+  border-color: #FFFFFF;
+}
+.outil--danger { background: rgba(192, 57, 43, 0.25); }
+.outil:disabled { opacity: 0.3; cursor: default; }
+
+/* Réglages (couleurs, épaisseur, style) */
+.reglage {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+  border: none;
+}
+
+.reglage--couleurs { gap: 4px; }
+
+.pastille-couleur {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  background: var(--c);
+  cursor: pointer;
+  padding: 0;
+}
+.pastille-couleur--active {
+  border-color: #FFFFFF;
+  transform: scale(1.15);
+  box-shadow: 0 0 0 2px var(--bleu-action);
+}
+
+.epaisseur {
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: #FFFFFF;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.epaisseur--active { background: var(--bleu-action); }
+
+.reglage--style, .reglage--pointe {
+  color: #FFFFFF;
+  font-size: 0.85rem;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  min-height: 38px;
+  padding: 0 12px;
+}
+
 /* ------------------- Accessibilité clavier ------------------------- */
 button:focus-visible, input:focus-visible {
   outline: 3px solid var(--jaune-chantier);

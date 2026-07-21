@@ -121,6 +121,11 @@
 
       <div class="fiche-photo__panneau">
 
+        <!-- Bouton d'annotation -->
+        <button id="btn-annoter" class="btn btn--principal btn--pleine-largeur btn--large" type="button">
+          ✏️ Annoter la photo
+        </button>
+
         <!-- ----- TAGS ----- -->
         <section class="bloc">
           <div class="bloc__entete">
@@ -257,6 +262,70 @@
   </dialog>
 
   <!-- ================================================================
+       ÉCRAN ANNOTATION : éditeur de dessin sur la photo
+       Les annotations sont des OBJETS séparés (jamais fusionnés dans
+       l'image) : on peut donc les déplacer/supprimer plus tard.
+       ================================================================ -->
+  <section id="ecran-annotation" class="ecran ecran--annotation">
+
+    <header class="barre barre--annotation">
+      <button id="btn-annot-annuler-tout" class="btn-retour" type="button" aria-label="Quitter sans enregistrer">✕</button>
+      <div class="annot-historique">
+        <button id="btn-annot-undo" class="btn-annot-hist" type="button" aria-label="Annuler" disabled>↩︎</button>
+        <button id="btn-annot-redo" class="btn-annot-hist" type="button" aria-label="Refaire" disabled>↪︎</button>
+      </div>
+      <button id="btn-annot-enregistrer" class="btn-annot-ok" type="button">✓ Enregistrer</button>
+    </header>
+
+    <!-- Zone de dessin : le canvas est dimensionné à la taille de l'image ;
+         le CSS le met à l'échelle pour tenir dans la zone. -->
+    <main class="zone-dessin">
+      <canvas id="canvas-annotation" class="canvas-annotation"></canvas>
+    </main>
+
+    <!-- Barre d'outils en bas -->
+    <div class="outils">
+
+      <!-- Ligne 1 : les outils -->
+      <div class="outils__ligne outils__ligne--principale">
+        <button class="outil outil--actif" data-outil="selection" type="button" aria-label="Sélectionner / déplacer" title="Sélectionner">↖</button>
+        <button class="outil" data-outil="trace" type="button" aria-label="Dessin libre" title="Dessin libre">✏️</button>
+        <button class="outil" data-outil="fleche" type="button" aria-label="Flèche" title="Flèche">↗</button>
+        <button class="outil" data-outil="rectangle" type="button" aria-label="Rectangle" title="Rectangle">▭</button>
+        <button class="outil" data-outil="ellipse" type="button" aria-label="Cercle" title="Cercle">◯</button>
+        <button class="outil" data-outil="texte" type="button" aria-label="Texte" title="Texte">T</button>
+        <button id="btn-annot-supprimer" class="outil outil--danger" type="button" aria-label="Supprimer la sélection" title="Supprimer" disabled>🗑</button>
+      </div>
+
+      <!-- Ligne 2 : les réglages -->
+      <div class="outils__ligne outils__ligne--reglages">
+
+        <!-- Couleurs -->
+        <div class="reglage reglage--couleurs" id="palette-couleurs">
+          <button class="pastille-couleur pastille-couleur--active" data-couleur="#E53935" style="--c:#E53935" type="button" aria-label="Rouge"></button>
+          <button class="pastille-couleur" data-couleur="#1E88E5" style="--c:#1E88E5" type="button" aria-label="Bleu"></button>
+          <button class="pastille-couleur" data-couleur="#43A047" style="--c:#43A047" type="button" aria-label="Vert"></button>
+          <button class="pastille-couleur" data-couleur="#FDD835" style="--c:#FDD835" type="button" aria-label="Jaune"></button>
+          <button class="pastille-couleur" data-couleur="#000000" style="--c:#000000" type="button" aria-label="Noir"></button>
+          <button class="pastille-couleur" data-couleur="#FFFFFF" style="--c:#FFFFFF" type="button" aria-label="Blanc"></button>
+        </div>
+
+        <!-- Épaisseur -->
+        <div class="reglage reglage--epaisseur">
+          <button class="epaisseur" data-epaisseur="3" type="button" aria-label="Fin">•</button>
+          <button class="epaisseur epaisseur--active" data-epaisseur="6" type="button" aria-label="Moyen">●</button>
+          <button class="epaisseur" data-epaisseur="12" type="button" aria-label="Épais">⬤</button>
+        </div>
+
+        <!-- Style de trait -->
+        <button id="btn-style-trait" class="reglage reglage--style" data-style="plein" type="button">─ Plein</button>
+
+        <!-- Type de pointe (visible seulement pour la flèche) -->
+        <button id="btn-type-pointe" class="reglage reglage--pointe" data-pointe="triangle" type="button" hidden>▶ Pleine</button>
+      </div>
+    </div>
+  </section>
+  <!-- ================================================================
        FENÊTRE : gestion des tags du dossier
        L'opérateur crée ici la liste des tags (Localisation et Remarque)
        qu'il pourra ensuite cocher sur chaque photo.
@@ -300,6 +369,7 @@
   <script src="js/predefinis.js"></script>
   <script src="js/tags.js"></script>
   <script src="js/dictee.js"></script>
+  <script src="js/annotate.js"></script>
   <script src="js/photos.js"></script>
   <script src="js/dossiers.js"></script>
   <script src="js/app.js"></script>

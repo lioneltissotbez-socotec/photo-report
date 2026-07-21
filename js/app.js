@@ -53,6 +53,7 @@ const App = (() => {
     Camera.initialiser();
     Tags.initialiser();
     Dictee.initialiser();
+    Annotate.initialiser();
     await Dossiers.afficherListe();
     surveillerReseau();
     enregistrerServiceWorker();
