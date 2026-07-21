@@ -24,6 +24,7 @@
   <section id="ecran-accueil" class="ecran ecran--visible">
 
     <header class="barre">
+      <img src="icons/logo-transparent.png" alt="Socotec" class="barre__logo">
       <div class="barre__titres">
         <h1 class="barre__titre">Reportage Photo</h1>
         <p class="barre__sous-titre">Socotec Diagnostic</p>
@@ -81,6 +82,11 @@
       <!-- Accès aux plans du dossier -->
       <button id="btn-ouvrir-plans" class="btn btn--secondaire btn--pleine-largeur" type="button">
         🗺️ Plans du dossier
+      </button>
+
+      <!-- Export du dossier (PDF + archive ZIP) -->
+      <button id="btn-exporter" class="btn btn--secondaire btn--pleine-largeur" type="button">
+        📤 Exporter le dossier
       </button>
 
       <!-- Grille de vignettes, remplie par js/photos.js -->
@@ -505,6 +511,59 @@
     </div>
   </section>
 
+  <!-- FENÊTRE : options d'export du dossier -->
+  <dialog id="dialogue-export" class="dialogue dialogue--large">
+    <div class="dialogue__contenu">
+      <h2 class="dialogue__titre">Exporter le dossier</h2>
+
+      <!-- Filtre par tags : tout coché par défaut, on décoche pour exclure -->
+      <p class="export-intro">
+        Toutes les photos sont exportées dans l'ordre de leur numéro.
+        Décochez un tag pour <strong>exclure</strong> de l'export les photos qui le portent.
+      </p>
+
+      <div class="export-section">
+        <p class="bloc__sous-titre">📍 Localisation</p>
+        <div id="export-tags-localisation" class="export-tags"></div>
+      </div>
+      <div class="export-section">
+        <p class="bloc__sous-titre">⚠️ Remarque</p>
+        <div id="export-tags-remarque" class="export-tags"></div>
+      </div>
+
+      <p id="export-compte" class="export-compte"></p>
+      <p id="export-progression" class="indicateur-ajout" hidden></p>
+
+      <div class="dialogue__actions dialogue__actions--colonne">
+        <button type="button" id="btn-export-pdf" class="btn btn--principal btn--pleine-largeur btn--large">
+          📄 Générer le PDF
+        </button>
+        <button type="button" id="btn-export-zip" class="btn btn--secondaire btn--pleine-largeur btn--large">
+          🗜️ Archive ZIP (photos + données)
+        </button>
+        <button type="button" id="btn-export-fermer" class="btn btn--secondaire btn--pleine-largeur">
+          Fermer
+        </button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- FENÊTRE : saisie du texte d'annotation (remplace prompt(),
+       peu fiable sur mobile) -->
+  <dialog id="dialogue-texte" class="dialogue">
+    <div class="dialogue__contenu">
+      <h2 class="dialogue__titre">Ajouter un texte</h2>
+      <label class="champ">
+        <span class="champ__etiquette">Texte</span>
+        <input id="champ-texte-annot" type="text" placeholder="Votre texte…" autocomplete="off">
+      </label>
+      <div class="dialogue__actions">
+        <button type="button" id="btn-texte-annuler" class="btn btn--secondaire">Annuler</button>
+        <button type="button" id="btn-texte-valider" class="btn btn--principal">Ajouter</button>
+      </div>
+    </div>
+  </dialog>
+
   <!-- FENÊTRE : confirmation suppression plan -->
   <dialog id="dialogue-supprimer-plan" class="dialogue">
     <div class="dialogue__contenu">
@@ -555,6 +614,9 @@
        db.js → (geo, camera, tags, dictee) → photos → dossiers → app -->
   <!-- Bibliothèque pdf.js (locale, pour lire les plans PDF hors ligne) -->
   <script src="lib/pdf.min.js"></script>
+  <!-- jsPDF (génération PDF) et JSZip (archive), locales -->
+  <script src="lib/jspdf.umd.min.js"></script>
+  <script src="lib/jszip.min.js"></script>
 
   <script src="js/db.js"></script>
   <script src="js/geo.js"></script>
@@ -566,6 +628,7 @@
   <script src="js/carte.js"></script>
   <script src="js/plans.js"></script>
   <script src="js/photos.js"></script>
+  <script src="js/export.js"></script>
   <script src="js/dossiers.js"></script>
   <script src="js/app.js"></script>
 </body>

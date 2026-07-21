@@ -83,6 +83,14 @@ body {
 
 .barre__titres { flex: 1; min-width: 0; }
 
+/* Logo Socotec dans le header */
+.barre__logo {
+  height: 34px;
+  width: auto;
+  flex-shrink: 0;
+  margin-right: 2px;
+}
+
 .barre__titre {
   font-size: 1.15rem;
   font-weight: 700;
@@ -1239,6 +1247,31 @@ body {
   text-align: center;
 }
 .carte-capture { flex: 1; min-height: 48px; font-weight: 800; }
+
+/* ====================================================================
+   Fenêtre d'export
+   ==================================================================== */
+.export-intro {
+  font-size: 0.9rem;
+  color: var(--encre-douce);
+  line-height: 1.5;
+  margin-bottom: 16px;
+}
+.export-section { margin-bottom: 14px; }
+.export-tags { display: flex; flex-wrap: wrap; gap: 8px; }
+.export-compte {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--bleu-action);
+  margin: 8px 0 16px;
+  padding: 10px 12px;
+  background: #E7F0F9;
+  border-radius: 8px;
+}
+.dialogue__actions--colonne {
+  flex-direction: column;
+  gap: 10px;
+}
 
 /* ------------------- Accessibilité clavier ------------------------- */
 button:focus-visible, input:focus-visible {

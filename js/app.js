@@ -56,6 +56,7 @@ const App = (() => {
     Annotate.initialiser();
     Plans.initialiser();
     Carte.initialiser();
+    Export.initialiser();
     await Dossiers.afficherListe();
     surveillerReseau();
     enregistrerServiceWorker();

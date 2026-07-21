@@ -335,8 +335,15 @@ const Annotate = (() => {
     enCours = true;
 
     if (outil === 'selection') {
+      const dejaSelectionne = selection;
       selection = trouverFormeSous(p);
       majBoutonSupprimer();
+      // Si on retouche un TEXTE déjà sélectionné → on le modifie
+      if (selection && selection.type === 'texte' && selection === dejaSelectionne) {
+        enCours = false;
+        ouvrirSaisieTexte(null, selection);
+        return;
+      }
       redessiner();
       return;
     }
@@ -422,20 +429,12 @@ const Annotate = (() => {
       return;
     }
 
-    // Outil texte : invite au relâchement, si le point est dans l'image
+    // Outil texte : ouvre la fenêtre de saisie (au lieu de prompt, peu
+    // fiable sur mobile). Le texte est créé à la validation.
     if (outil === 'texte') {
       const p = pointDepart;
       if (!p || !pointDansImage(p)) return;
-      const saisie = prompt('Texte à ajouter :');
-      if (saisie && saisie.trim()) {
-        annotations.push({
-          id: crypto.randomUUID(), type: 'texte',
-          x: p.x, y: p.y, texte: saisie.trim(),
-          couleur, taille: Math.max(24, epaisseur * 6), style: 'plein',
-        });
-        enregistrerEtape();
-        redessiner();
-      }
+      ouvrirSaisieTexte(p);
       return;
     }
 
@@ -554,6 +553,46 @@ const Annotate = (() => {
   /* Vrai si l'écran d'annotation est actuellement affiché */
   function estEcranAnnotationVisible() {
     return document.getElementById('ecran-annotation').classList.contains('ecran--visible');
+  }
+
+  /* ==================================================================
+     SAISIE DE TEXTE (fenêtre dédiée, fiable sur mobile)
+     Sert à créer un nouveau texte (on passe un point) ou à modifier un
+     texte existant (on passe la forme à éditer).
+     ================================================================== */
+  let texteEnCours = null;   // { point } pour création, ou { forme } pour édition
+
+  function ouvrirSaisieTexte(point, formeExistante) {
+    texteEnCours = { point, forme: formeExistante || null };
+    const champ = document.getElementById('champ-texte-annot');
+    champ.value = formeExistante ? formeExistante.texte : '';
+    document.getElementById('dialogue-texte').showModal();
+    // Petit délai avant focus : laisse le temps au dialogue de s'afficher
+    setTimeout(() => champ.focus(), 50);
+  }
+
+  function validerSaisieTexte() {
+    const champ = document.getElementById('champ-texte-annot');
+    const valeur = champ.value.trim();
+    document.getElementById('dialogue-texte').close();
+
+    if (!valeur) { texteEnCours = null; return; }
+
+    if (texteEnCours.forme) {
+      // Modification d'un texte existant
+      texteEnCours.forme.texte = valeur;
+    } else {
+      // Création d'un nouveau texte
+      const p = texteEnCours.point;
+      annotations.push({
+        id: crypto.randomUUID(), type: 'texte',
+        x: p.x, y: p.y, texte: valeur,
+        couleur, taille: Math.max(24, epaisseur * 6), style: 'plein',
+      });
+    }
+    texteEnCours = null;
+    enregistrerEtape();
+    redessiner();
   }
 
   /* Vraie forme (évite d'ajouter un point isolé par accident) */
@@ -750,6 +789,19 @@ const Annotate = (() => {
     canvas.addEventListener('pointerup', auFin);
     canvas.addEventListener('pointercancel', auFin);
 
+    // --- Fenêtre de saisie de texte ---
+    document.getElementById('btn-texte-valider')
+      .addEventListener('click', validerSaisieTexte);
+    document.getElementById('btn-texte-annuler')
+      .addEventListener('click', () => {
+        document.getElementById('dialogue-texte').close();
+        texteEnCours = null;
+      });
+    document.getElementById('champ-texte-annot')
+      .addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); validerSaisieTexte(); }
+      });
+
     // --- Zoom : boutons +/− et réinitialisation ---
     const zone = () => document.querySelector('.zone-dessin').getBoundingClientRect();
     document.getElementById('btn-zoom-plus').addEventListener('click', () => {
@@ -804,13 +856,22 @@ const Annotate = (() => {
       });
     });
 
-    // --- Épaisseur ---
+    // --- Épaisseur (= taille de police pour un texte sélectionné) ---
     document.querySelectorAll('.epaisseur').forEach((bouton) => {
       bouton.addEventListener('click', () => {
         epaisseur = parseInt(bouton.dataset.epaisseur, 10);
         document.querySelectorAll('.epaisseur').forEach((b) =>
           b.classList.toggle('epaisseur--active', b === bouton));
-        if (selection) { selection.epaisseur = epaisseur; enregistrerEtape(); redessiner(); }
+        if (selection) {
+          if (selection.type === 'texte') {
+            // Pour un texte, l'épaisseur choisie définit la taille de police
+            selection.taille = Math.max(24, epaisseur * 6);
+          } else {
+            selection.epaisseur = epaisseur;
+          }
+          enregistrerEtape();
+          redessiner();
+        }
       });
     });
 

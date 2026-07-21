@@ -210,13 +210,17 @@ const Plans = (() => {
 
     for (const repere of (planCourant.reperes || [])) {
       const couleur = await couleurRepere(repere);
+      // Le numéro affiché est celui de la PHOTO (unique dans le dossier,
+      // identique sur tous les plans qui la référencent)
+      const numero = await Photos.numeroPhoto(dossierCourant.id, repere.photoId);
+
       const pastille = document.createElement('button');
       pastille.type = 'button';
       pastille.className = 'repere';
       pastille.style.left = (repere.x * 100) + '%';
       pastille.style.top = (repere.y * 100) + '%';
       pastille.style.background = couleur;
-      pastille.textContent = repere.numero;
+      pastille.textContent = (numero !== null ? numero : '?');
       pastille.dataset.id = repere.id;
 
       brancherRepere(pastille, repere);
@@ -270,10 +274,10 @@ const Plans = (() => {
         if (deplace) {
           await DB.enregistrer('plans', planCourant); // sauvegarde la position
         } else {
-          // Simple tap en mode placement → proposer de supprimer
-          if (confirm(`Supprimer le repère ${repere.numero} ?`)) {
+          // Simple tap en mode placement → proposer de supprimer le repère
+          // (la photo, elle, n'est pas supprimée)
+          if (confirm('Supprimer ce repère du plan ?')) {
             planCourant.reperes = planCourant.reperes.filter((r) => r.id !== repere.id);
-            renumeroter();
             await DB.enregistrer('plans', planCourant);
             await dessinerReperes();
           }
@@ -321,8 +325,10 @@ const Plans = (() => {
     urlApercu = URL.createObjectURL(photo.vignette);
     img.src = urlApercu;
 
-    // Numéro
-    document.getElementById('apercu-repere-num').textContent = 'Repère ' + repere.numero;
+    // Numéro de la photo (calculé, unique dans le dossier)
+    const numero = await Photos.numeroPhoto(dossierCourant.id, photo.id);
+    document.getElementById('apercu-repere-num').textContent =
+      'Photo n°' + (numero !== null ? numero : '?');
 
     // Remarques cochées sur la photo
     const zoneRem = document.getElementById('apercu-repere-remarques');
@@ -369,11 +375,6 @@ const Plans = (() => {
     photoApercuId = null;
   }
 
-  /* Renumérote les repères après une suppression (1, 2, 3…) */
-  function renumeroter() {
-    (planCourant.reperes || []).forEach((r, i) => { r.numero = i + 1; });
-  }
-
   /* ==================================================================
      PLACEMENT d'un nouveau repère (clic sur le plan en mode placement)
      ================================================================== */
@@ -394,7 +395,8 @@ const Plans = (() => {
 
   let repereEnAttente = null;
 
-  /* Crée le repère une fois la photo choisie/prise */
+  /* Crée le repère une fois la photo choisie/prise. On ne stocke PAS de
+     numéro : il est calculé à l'affichage depuis le rang de la photo. */
   async function finaliserRepere(photoId) {
     if (!repereEnAttente) return;
     if (!planCourant.reperes) planCourant.reperes = [];
@@ -404,7 +406,6 @@ const Plans = (() => {
       x: repereEnAttente.x,
       y: repereEnAttente.y,
       photoId,
-      numero: planCourant.reperes.length + 1,
     });
     await DB.enregistrer('plans', planCourant);
     repereEnAttente = null;
@@ -592,7 +593,8 @@ const Plans = (() => {
      RELATION PHOTO → REPÈRES
      Renvoie la liste des repères (à travers tous les plans du dossier)
      qui pointent vers une photo donnée. Utilisé par l'écran photo pour
-     afficher « Repère n°3 du plan RDC ».
+     afficher sur quels plans elle est positionnée. Le numéro, lui, est
+     celui de la photo (calculé par Photos.numeroPhoto).
      ================================================================== */
   async function reperesDeLaPhoto(dossierId, photoId) {
     const plans = await DB.obtenirParDossier('plans', dossierId);
@@ -600,7 +602,7 @@ const Plans = (() => {
     for (const plan of plans) {
       for (const repere of (plan.reperes || [])) {
         if (repere.photoId === photoId) {
-          resultat.push({ numero: repere.numero, nomPlan: plan.nom });
+          resultat.push({ nomPlan: plan.nom });
         }
       }
     }

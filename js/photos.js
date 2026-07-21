@@ -133,7 +133,7 @@ const Photos = (() => {
     grille.innerHTML = '';
     etatVide.hidden = photos.length > 0;
 
-    for (const photo of photos) {
+    photos.forEach((photo, index) => {
       const url = URL.createObjectURL(photo.vignette);
       urlsTemporaires.push(url);
 
@@ -141,20 +141,27 @@ const Photos = (() => {
       element.className = 'grille-photos__case';
       element.innerHTML = `<img src="${url}" alt="Vignette" loading="lazy">`;
 
-      // Pastille(s) de numéro de repère dans le coin, si la photo est
-      // pointée depuis un ou plusieurs plans
-      const reperes = await Plans.reperesDeLaPhoto(dossierCourant.id, photo.id);
-      if (reperes.length > 0) {
-        const numeros = reperes.map((r) => r.numero).join('·');
-        const pastille = document.createElement('span');
-        pastille.className = 'case-numero';
-        pastille.textContent = numeros;
-        element.appendChild(pastille);
-      }
+      // Numéro de la photo = son rang dans le dossier (unique, stable,
+      // se recale automatiquement si une photo est supprimée). Affiché
+      // sur TOUTES les vignettes.
+      const pastille = document.createElement('span');
+      pastille.className = 'case-numero';
+      pastille.textContent = index + 1;
+      element.appendChild(pastille);
 
       element.addEventListener('click', () => ouvrirPhoto(photo));
       grille.appendChild(element);
-    }
+    });
+  }
+
+  /* Numéro d'une photo = son rang (par date de création) dans le dossier.
+     Calculé à la volée : garantit l'unicité, la stabilité entre les plans,
+     et le recalage automatique après une suppression. Exposé pour plans.js. */
+  async function numeroPhoto(dossierId, photoId) {
+    const photos = await DB.obtenirParDossier('photos', dossierId);
+    photos.sort((a, b) => a.dateCreation - b.dateCreation);
+    const i = photos.findIndex((p) => p.id === photoId);
+    return i >= 0 ? i + 1 : null;
   }
 
   /* ------------------------------------------------------------------
@@ -180,13 +187,20 @@ const Photos = (() => {
     Tags.afficherTagsPhoto(dossierCourant, photo);
     document.getElementById('champ-observation').value = photo.observation || '';
 
-    // Repères de plan pointant vers cette photo (chargement asynchrone)
+    // Numéro de la photo dans le titre (rang dans le dossier)
+    numeroPhoto(dossierCourant.id, photo.id).then((n) => {
+      document.getElementById('photo-titre').textContent =
+        n ? ('Photo n°' + n) : 'Photo';
+    });
+
+    // Plans qui pointent vers cette photo (chargement asynchrone)
     afficherReperesLies(photo);
 
     App.montrerEcran('ecran-photo');
   }
 
-  /* Affiche les repères de plan qui pointent vers cette photo */
+  /* Affiche les plans qui pointent vers cette photo (tous portent le
+     même numéro : celui de la photo) */
   async function afficherReperesLies(photo) {
     const zone = document.getElementById('photo-reperes');
     const reperes = await Plans.reperesDeLaPhoto(dossierCourant.id, photo.id);
@@ -195,14 +209,16 @@ const Photos = (() => {
       zone.hidden = true;
       return;
     }
+    // Noms de plans distincts (une photo peut avoir plusieurs repères
+    // sur le même plan ; on ne liste chaque plan qu'une fois)
+    const nomsPlans = [...new Set(reperes.map((r) => r.nomPlan))];
+
     zone.hidden = false;
-    zone.innerHTML = '<span class="photo-reperes__titre">📍 Repère(s) sur plan :</span>';
-    for (const r of reperes) {
+    zone.innerHTML = '<span class="photo-reperes__titre">📍 Positionnée sur :</span>';
+    for (const nom of nomsPlans) {
       const puce = document.createElement('span');
       puce.className = 'photo-reperes__puce';
-      // Numéro dans une pastille + nom du plan
-      puce.innerHTML = `<span class="photo-reperes__num">${r.numero}</span>`;
-      puce.appendChild(document.createTextNode(' ' + r.nomPlan));
+      puce.appendChild(document.createTextNode(nom));
       zone.appendChild(puce);
     }
   }
@@ -305,6 +321,7 @@ const Photos = (() => {
     ouvrir,
     ouvrirPhoto,
     creerPhotoDepuisFichier,
+    numeroPhoto,
     dossierActuel: () => dossierCourant,
   };
 

@@ -15,15 +15,19 @@
    garderaient l'ancienne version en cache).
    ==================================================================== */
 
-const VERSION_CACHE = 'reportage-photo-v16';
+const VERSION_CACHE = 'reportage-photo-v20';
 
 const FICHIERS_APP = [
   './',
   './index.html',
   './manifest.json',
   './css/styles.css',
+  './icons/logo-transparent.png',
+  './icons/logo-pdf.png',
   './lib/pdf.min.js',
   './lib/pdf.worker.min.js',
+  './lib/jspdf.umd.min.js',
+  './lib/jszip.min.js',
   './js/db.js',
   './js/geo.js',
   './js/camera.js',
@@ -34,6 +38,7 @@ const FICHIERS_APP = [
   './js/carte.js',
   './js/plans.js',
   './js/photos.js',
+  './js/export.js',
   './js/dossiers.js',
   './js/app.js',
   './icons/icon-192.png',
