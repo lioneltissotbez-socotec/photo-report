@@ -60,8 +60,21 @@ const Photos = (() => {
      'imageOrientation: from-image' corrige automatiquement les photos
      prises en mode portrait (sinon elles apparaîtraient couchées).
      ------------------------------------------------------------------ */
+  async function chargerBitmap(fichier) {
+    if ('createImageBitmap' in window) {
+      try { return await createImageBitmap(fichier, { imageOrientation: 'from-image' }); } catch (_) {}
+    }
+    const url = URL.createObjectURL(fichier);
+    try {
+      const img = await new Promise((resolve, reject) => {
+        const el = new Image(); el.onload = () => resolve(el); el.onerror = reject; el.src = url;
+      });
+      return img;
+    } finally { URL.revokeObjectURL(url); }
+  }
+
   async function compresser(fichier, coteMax, qualite) {
-    const image = await createImageBitmap(fichier, { imageOrientation: 'from-image' });
+    const image = await chargerBitmap(fichier);
 
     // Échelle de réduction (jamais d'agrandissement : Math.min avec 1)
     const echelle = Math.min(1, coteMax / Math.max(image.width, image.height));
@@ -70,7 +83,7 @@ const Photos = (() => {
     canvas.width = Math.round(image.width * echelle);
     canvas.height = Math.round(image.height * echelle);
     canvas.getContext('2d').drawImage(image, 0, 0, canvas.width, canvas.height);
-    image.close(); // libère la mémoire de l'image d'origine
+    if (typeof image.close === 'function') image.close();
 
     return new Promise((resoudre) =>
       canvas.toBlob(resoudre, 'image/jpeg', qualite));
@@ -87,11 +100,14 @@ const Photos = (() => {
       id: crypto.randomUUID(),
       dossierId: dossierCourant.id,   // lien vers le dossier parent
       dateCreation: Date.now(),
+      numero: await DB.prochainNumeroPhoto(dossierCourant.id),
       image: await compresser(fichier, COTE_MAX_IMAGE, QUALITE_IMAGE),
       vignette: await compresser(fichier, COTE_MAX_VIGNETTE, QUALITE_VIGNETTE),
       tags: [],          // rempli à l'étape 3
       observation: '',   // rempli à l'étape 3
       annotations: [],   // rempli à l'étape 4
+      exterieure: false,  // active la géolocalisation propre à la photo
+      gps: null,          // { latitude, longitude, precision } en degrés décimaux
     };
     await DB.enregistrer('photos', photo);
 
@@ -105,15 +121,19 @@ const Photos = (() => {
   async function ajouterFichiers(fichiers) {
     if (!fichiers || fichiers.length === 0) return;
 
-    indicateurAjout.hidden = false; // "Ajout des photos en cours…"
-
-    for (const fichier of fichiers) {
-      if (!fichier.type.startsWith('image/')) continue; // ignore les non-images
-      await creerPhotoDepuisFichier(fichier);
+    indicateurAjout.hidden = false;
+    let importees = 0, erreurs = 0;
+    try {
+      for (const fichier of fichiers) {
+        if (!fichier.type.startsWith('image/')) continue;
+        try { await creerPhotoDepuisFichier(fichier); importees++; }
+        catch (e) { console.error('Import image échoué :', fichier.name, e); erreurs++; }
+      }
+      await afficherGrille();
+      if (erreurs) alert(`${importees} photo(s) importée(s), ${erreurs} fichier(s) en erreur.`);
+    } finally {
+      indicateurAjout.hidden = true;
     }
-
-    indicateurAjout.hidden = true;
-    await afficherGrille();
 
     // Si la photo venait de l'écran caméra, on le ferme et on revient
     // à la grille du dossier pour voir la nouvelle vignette.
@@ -146,7 +166,7 @@ const Photos = (() => {
       // sur TOUTES les vignettes.
       const pastille = document.createElement('span');
       pastille.className = 'case-numero';
-      pastille.textContent = index + 1;
+      pastille.textContent = photo.numero || index + 1;
       element.appendChild(pastille);
 
       element.addEventListener('click', () => ouvrirPhoto(photo));
@@ -160,8 +180,9 @@ const Photos = (() => {
   async function numeroPhoto(dossierId, photoId) {
     const photos = await DB.obtenirParDossier('photos', dossierId);
     photos.sort((a, b) => a.dateCreation - b.dateCreation);
-    const i = photos.findIndex((p) => p.id === photoId);
-    return i >= 0 ? i + 1 : null;
+    const photo = photos.find((p) => p.id === photoId);
+    if (!photo) return null;
+    return Number(photo.numero) || (photos.findIndex((p) => p.id === photoId) + 1);
   }
 
   /* ------------------------------------------------------------------
@@ -186,6 +207,7 @@ const Photos = (() => {
     // Tags cochables (localisation + remarque) et observation existante
     Tags.afficherTagsPhoto(dossierCourant, photo);
     document.getElementById('champ-observation').value = photo.observation || '';
+    afficherGeolocalisationPhoto(photo);
 
     // Numéro de la photo dans le titre (rang dans le dossier)
     numeroPhoto(dossierCourant.id, photo.id).then((n) => {
@@ -224,12 +246,78 @@ const Photos = (() => {
   }
 
   /* ------------------------------------------------------------------
+     GÉOLOCALISATION PROPRE À UNE PHOTO EXTÉRIEURE
+     ------------------------------------------------------------------ */
+  function valeurCoordonnee(valeur, minimum, maximum) {
+    if (valeur === '' || valeur === null || valeur === undefined) return null;
+    const nombre = Number(String(valeur).replace(',', '.'));
+    return Number.isFinite(nombre) && nombre >= minimum && nombre <= maximum ? nombre : null;
+  }
+
+  function afficherGeolocalisationPhoto(photo) {
+    const active = Boolean(photo.exterieure || photo.gps);
+    const caseExterieure = document.getElementById('photo-exterieure');
+    const zone = document.getElementById('photo-gps-zone');
+    const lat = document.getElementById('photo-latitude');
+    const lon = document.getElementById('photo-longitude');
+    const etat = document.getElementById('photo-gps-etat');
+    caseExterieure.checked = active;
+    zone.hidden = !active;
+    lat.value = Number.isFinite(Number(photo.gps?.latitude)) ? Number(photo.gps.latitude).toFixed(6) : '';
+    lon.value = Number.isFinite(Number(photo.gps?.longitude)) ? Number(photo.gps.longitude).toFixed(6) : '';
+    if (photo.gps?.precision) {
+      etat.hidden = false;
+      etat.textContent = `Précision estimée : ± ${Math.round(photo.gps.precision)} m`;
+    } else {
+      etat.hidden = true; etat.textContent = '';
+    }
+  }
+
+  async function enregistrerCoordonneesSaisies() {
+    if (!photoCourante) return;
+    const latitude = valeurCoordonnee(document.getElementById('photo-latitude').value, -90, 90);
+    const longitude = valeurCoordonnee(document.getElementById('photo-longitude').value, -180, 180);
+    photoCourante.exterieure = document.getElementById('photo-exterieure').checked;
+    if (latitude !== null && longitude !== null) {
+      photoCourante.gps = { ...(photoCourante.gps || {}), latitude, longitude };
+    } else if (!photoCourante.exterieure) {
+      photoCourante.gps = null;
+    }
+    await DB.enregistrer('photos', photoCourante);
+  }
+
+  async function geolocaliserPhoto() {
+    if (!photoCourante) return;
+    const bouton = document.getElementById('btn-geolocaliser-photo');
+    const etat = document.getElementById('photo-gps-etat');
+    bouton.disabled = true;
+    etat.hidden = false; etat.textContent = 'Recherche de la position GPS…';
+    try {
+      const position = await Geo.localiser();
+      photoCourante.exterieure = true;
+      photoCourante.gps = {
+        latitude: position.latitude, longitude: position.longitude, precision: position.precision || null,
+      };
+      await DB.enregistrer('photos', photoCourante);
+      afficherGeolocalisationPhoto(photoCourante);
+    } catch (erreur) {
+      console.error('Géolocalisation de la photo impossible :', erreur);
+      etat.hidden = false;
+      etat.textContent = erreur.code === 1
+        ? 'Autorisation de géolocalisation refusée.'
+        : 'Position GPS non disponible. Vous pouvez saisir les coordonnées manuellement.';
+    } finally {
+      bouton.disabled = false;
+    }
+  }
+
+  /* ------------------------------------------------------------------
      SUPPRESSION d'une photo (avec confirmation)
      ------------------------------------------------------------------ */
   async function confirmerSuppressionPhoto() {
     Dictee.arreter();
     if (photoCourante) {
-      await DB.supprimer('photos', photoCourante.id);
+      await DB.supprimerPhotoComplete(photoCourante.id, dossierCourant.id);
       photoCourante = null;
     }
     dialogueSupprimer.close();
@@ -301,6 +389,21 @@ const Photos = (() => {
         }
       }, 400);
     });
+
+    const caseExterieure = document.getElementById('photo-exterieure');
+    const zoneGps = document.getElementById('photo-gps-zone');
+    caseExterieure.addEventListener('change', async () => {
+      zoneGps.hidden = !caseExterieure.checked;
+      if (photoCourante) {
+        photoCourante.exterieure = caseExterieure.checked;
+        if (!caseExterieure.checked) photoCourante.gps = null;
+        await DB.enregistrer('photos', photoCourante);
+        afficherGeolocalisationPhoto(photoCourante);
+      }
+    });
+    document.getElementById('btn-geolocaliser-photo').addEventListener('click', geolocaliserPhoto);
+    document.getElementById('photo-latitude').addEventListener('change', enregistrerCoordonneesSaisies);
+    document.getElementById('photo-longitude').addEventListener('change', enregistrerCoordonneesSaisies);
 
     document.getElementById('btn-supprimer-photo')
       .addEventListener('click', () => dialogueSupprimer.showModal());

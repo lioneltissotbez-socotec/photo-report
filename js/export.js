@@ -185,7 +185,7 @@ const Export = (() => {
       pdf.setFontSize(14); pdf.setTextColor(15, 44, 74);
       pdf.text('Plan : ' + plan.nom, marge, 18);
 
-      const canvasPlan = await composerPlan(plan);
+      const canvasPlan = await composerPlan(plan, new Set(photos.map((p) => p.id)));
       const imgData = canvasPlan.toDataURL('image/jpeg', 0.85);
       const ratio = canvasPlan.height / canvasPlan.width;
 
@@ -269,6 +269,9 @@ const Export = (() => {
       yi += 4.5 + lignes.length * 4.5 + 3;
     };
     bloc('LOCALISATION', loc);
+    if (photo.exterieure && Number.isFinite(Number(photo.gps?.latitude)) && Number.isFinite(Number(photo.gps?.longitude))) {
+      bloc('COORDONNÉES GPS', `${Number(photo.gps.latitude).toFixed(6)}, ${Number(photo.gps.longitude).toFixed(6)}`);
+    }
     bloc('REMARQUES', rem);
     if (photo.observation && photo.observation.trim()) {
       bloc('OBSERVATION', photo.observation.trim());
@@ -276,7 +279,7 @@ const Export = (() => {
   }
 
   /* Compose un plan + ses repères (numéros + couleurs) sur un canvas */
-  async function composerPlan(plan) {
+  async function composerPlan(plan, photoIdsInclus = null) {
     const img = await chargerImage(plan.image);
     const canvas = document.createElement('canvas');
     canvas.width = img.naturalWidth;
@@ -285,6 +288,7 @@ const Export = (() => {
     ctx.drawImage(img, 0, 0);
 
     for (const repere of (plan.reperes || [])) {
+      if (photoIdsInclus && !photoIdsInclus.has(repere.photoId)) continue;
       const numero = await Photos.numeroPhoto(dossierCourant.id, repere.photoId);
       const cx = repere.x * canvas.width;
       const cy = repere.y * canvas.height;
@@ -330,67 +334,67 @@ const Export = (() => {
      EXPORT ZIP (archive technique)
      ================================================================== */
   async function genererZip() {
-    progression('Préparation de l\'archive…');
+    progression('Préparation de la sauvegarde…');
     const zip = new JSZip();
-
     const photos = await photosAExporter();
     const plans = await DB.obtenirParDossier('plans', dossierCourant.id);
+    const dossierPhotos = zip.folder('photos-optimisees');
+    const dossierAnnotees = zip.folder('photos-annotees');
+    const dossierPlans = zip.folder('plans');
 
-    // Dossier "photos" : les images originales, nommées par numéro
-    const dossierPhotos = zip.folder('photos');
     const donnees = {
+      format: 'photo-report',
+      versionFormat: 2,
+      versionApplication: '2.1.3',
       dossier: {
+        id: dossierCourant.id,
         nom: dossierCourant.nom,
         reference: dossierCourant.reference,
         adresse: dossierCourant.adresse,
         gps: dossierCourant.gps || null,
-        dateCreation: dossierCourant.dateCreation,
         tags: dossierCourant.tags || [],
+        dateCreation: dossierCourant.dateCreation,
+        dateModification: dossierCourant.dateModification,
       },
-      photos: [],
-      plans: [],
-      exporteLe: new Date().toISOString(),
+      photos: [], plans: [], exporteLe: new Date().toISOString(),
     };
 
     for (let i = 0; i < photos.length; i++) {
       const photo = photos[i];
-      progression(`Archive : photo ${i + 1} / ${photos.length}…`);
+      progression(`Sauvegarde : photo ${i + 1} / ${photos.length}…`);
       const numero = await Photos.numeroPhoto(dossierCourant.id, photo.id);
-      const nomImage = `photo-${String(numero).padStart(3, '0')}.jpg`;
-      dossierPhotos.file(nomImage, photo.image);
-
+      const base = `photo-${String(numero).padStart(3, '0')}`;
+      const fichier = `photos-optimisees/${base}.jpg`;
+      dossierPhotos.file(`${base}.jpg`, photo.image);
+      let fichierAnnote = null;
+      if (photo.apercu) {
+        fichierAnnote = `photos-annotees/${base}-annotee.jpg`;
+        dossierAnnotees.file(`${base}-annotee.jpg`, photo.apercu);
+      }
       donnees.photos.push({
-        numero,
-        fichier: 'photos/' + nomImage,
-        localisation: tagsDe(photo, 'localisation'),
-        remarques: tagsDe(photo, 'remarque'),
-        observation: photo.observation || '',
-        annotations: photo.annotations || [],
-        dateCreation: photo.dateCreation,
+        id: photo.id, numero, fichier, fichierAnnote,
+        tags: photo.tags || [], observation: photo.observation || '',
+        exterieure: Boolean(photo.exterieure), gps: photo.gps || null,
+        annotations: photo.annotations || [], dateCreation: photo.dateCreation,
       });
     }
 
-    // Plans : image + repères
-    const dossierPlans = zip.folder('plans');
     for (let i = 0; i < plans.length; i++) {
       const plan = plans[i];
       const nomPlan = `plan-${String(i + 1).padStart(2, '0')}.jpg`;
       dossierPlans.file(nomPlan, plan.image);
-
-      const reperes = [];
-      for (const r of (plan.reperes || [])) {
-        reperes.push({
-          numeroPhoto: await Photos.numeroPhoto(dossierCourant.id, r.photoId),
-          x: r.x, y: r.y,
-        });
-      }
-      donnees.plans.push({ nom: plan.nom, fichier: 'plans/' + nomPlan, reperes });
+      const reperes = (plan.reperes || [])
+        .filter((r) => photos.some((p) => p.id === r.photoId))
+        .map((r) => ({ id: r.id, photoId: r.photoId, x: r.x, y: r.y }));
+      donnees.plans.push({
+        id: plan.id, nom: plan.nom, fichier: 'plans/' + nomPlan,
+        dateCreation: plan.dateCreation, reperes,
+      });
     }
 
     zip.file('donnees.json', JSON.stringify(donnees, null, 2));
-
     progression('Compression…');
-    const blob = await zip.generateAsync({ type: 'blob' });
+    const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } });
     telecharger(blob, nomFichier('zip'));
     progression('');
   }

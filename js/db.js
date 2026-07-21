@@ -1,134 +1,131 @@
-/* ====================================================================
-   db.js — Couche base de données (IndexedDB)
-   --------------------------------------------------------------------
-   RÔLE : ce fichier est le SEUL endroit du projet qui parle à
-   IndexedDB. Tous les autres fichiers passent par les fonctions DB.*
-   Avantage : si demain on change de stockage, on ne modifie qu'ici.
-
-   IndexedDB est asynchrone et fonctionne avec des "requêtes" et des
-   événements. Pour simplifier son usage partout ailleurs, on
-   l'enveloppe dans des Promesses : on pourra écrire
-       const dossiers = await DB.obtenirTous('dossiers');
-   ==================================================================== */
-
+/* Couche unique d'accès à IndexedDB. */
 const DB = (() => {
-
   const NOM_BASE = 'reportage-photo';
-  const VERSION = 1; // à incrémenter si on modifie le schéma plus tard
+  // Ne pas imposer de version : l'application réutilise directement la base
+  // historique existante. Le schéma actuel est identique à la version 1.
+  let base = null;
 
-  let base = null; // connexion ouverte, réutilisée par toutes les fonctions
-
-  /* ------------------------------------------------------------------
-     Ouverture de la base + création du schéma.
-     'onupgradeneeded' ne s'exécute QUE la première fois (ou quand
-     VERSION augmente) : c'est là qu'on déclare les "magasins"
-     (l'équivalent des tables) et leurs index de recherche.
-     Le schéma couvre déjà toutes les étapes du projet :
-       - dossiers   : les dossiers de reportage
-       - photos     : les photos (liées à un dossier via dossierId)
-       - plans      : les plans avec repères (liés à un dossier)
-       - remarques  : la bibliothèque de tags Remarque commune
-     ------------------------------------------------------------------ */
   function ouvrir() {
-    return new Promise((resoudre, rejeter) => {
-      if (base) { resoudre(base); return; } // déjà ouverte : on réutilise
-
-      const requete = indexedDB.open(NOM_BASE, VERSION);
-
-      requete.onupgradeneeded = (evenement) => {
-        const b = evenement.target.result;
-
-        if (!b.objectStoreNames.contains('dossiers')) {
-          b.createObjectStore('dossiers', { keyPath: 'id' });
-        }
-
+    return new Promise((resolve, reject) => {
+      if (base) return resolve(base);
+      const req = indexedDB.open(NOM_BASE);
+      req.onupgradeneeded = (event) => {
+        const b = event.target.result;
+        if (!b.objectStoreNames.contains('dossiers')) b.createObjectStore('dossiers', { keyPath: 'id' });
         if (!b.objectStoreNames.contains('photos')) {
-          const magasinPhotos = b.createObjectStore('photos', { keyPath: 'id' });
-          // Index = permet de retrouver vite toutes les photos d'un dossier
-          magasinPhotos.createIndex('parDossier', 'dossierId', { unique: false });
+          const s = b.createObjectStore('photos', { keyPath: 'id' });
+          s.createIndex('parDossier', 'dossierId', { unique: false });
         }
-
         if (!b.objectStoreNames.contains('plans')) {
-          const magasinPlans = b.createObjectStore('plans', { keyPath: 'id' });
-          magasinPlans.createIndex('parDossier', 'dossierId', { unique: false });
+          const s = b.createObjectStore('plans', { keyPath: 'id' });
+          s.createIndex('parDossier', 'dossierId', { unique: false });
         }
-
-        if (!b.objectStoreNames.contains('remarques')) {
-          b.createObjectStore('remarques', { keyPath: 'id' });
-        }
+        if (!b.objectStoreNames.contains('remarques')) b.createObjectStore('remarques', { keyPath: 'id' });
       };
-
-      requete.onsuccess = () => { base = requete.result; resoudre(base); };
-      requete.onerror = () => rejeter(requete.error);
+      req.onsuccess = () => {
+        base = req.result;
+        base.onversionchange = () => { base.close(); base = null; };
+        resolve(base);
+      };
+      req.onerror = () => reject(req.error);
+      req.onblocked = () => reject(new Error('Base de données bloquée par un autre onglet.'));
+      setTimeout(() => {
+        if (!base && req.readyState === 'pending') {
+          reject(new Error('L’ouverture de la base locale prend trop de temps. Fermez les autres onglets de l’application puis rechargez.'));
+        }
+      }, 8000);
     });
   }
 
-  /* ------------------------------------------------------------------
-     Petite fonction interne : exécute une opération dans une
-     transaction et renvoie une Promesse. Évite de répéter le même
-     code dans chaque fonction publique.
-     ------------------------------------------------------------------ */
-  function transaction(nomMagasin, mode, operation) {
-    return ouvrir().then((b) => new Promise((resoudre, rejeter) => {
-      const tx = b.transaction(nomMagasin, mode);
-      const magasin = tx.objectStore(nomMagasin);
-      const requete = operation(magasin);
-      requete.onsuccess = () => resoudre(requete.result);
-      requete.onerror = () => rejeter(requete.error);
+  function transaction(magasins, mode, operation) {
+    const noms = Array.isArray(magasins) ? magasins : [magasins];
+    return ouvrir().then((b) => new Promise((resolve, reject) => {
+      const tx = b.transaction(noms, mode);
+      let resultat;
+      let erreurOperation = null;
+      tx.oncomplete = () => resolve(resultat);
+      tx.onerror = () => reject(tx.error || erreurOperation || new Error('Transaction IndexedDB échouée.'));
+      tx.onabort = () => reject(tx.error || erreurOperation || new Error('Transaction IndexedDB annulée.'));
+      try {
+        resultat = operation(tx, (nom) => tx.objectStore(nom));
+      } catch (e) {
+        erreurOperation = e;
+        try { tx.abort(); } catch (_) {}
+      }
     }));
   }
 
-  /* ----------------------- Fonctions publiques ---------------------- */
-
-  // Ajoute OU met à jour un enregistrement (put = "écrase si existe")
-  function enregistrer(nomMagasin, objet) {
-    return transaction(nomMagasin, 'readwrite', (m) => m.put(objet));
+  function requete(magasin, mode, operation) {
+    return ouvrir().then((b) => new Promise((resolve, reject) => {
+      const tx = b.transaction(magasin, mode);
+      const req = operation(tx.objectStore(magasin));
+      let resultat;
+      req.onsuccess = () => { resultat = req.result; };
+      req.onerror = () => reject(req.error);
+      tx.oncomplete = () => resolve(resultat);
+      tx.onerror = () => reject(tx.error || req.error);
+      tx.onabort = () => reject(tx.error || new Error('Transaction annulée.'));
+    }));
   }
 
-  // Récupère un enregistrement par son id
-  function obtenir(nomMagasin, id) {
-    return transaction(nomMagasin, 'readonly', (m) => m.get(id));
-  }
+  const enregistrer = (m, o) => requete(m, 'readwrite', (s) => s.put(o));
+  const obtenir = (m, id) => requete(m, 'readonly', (s) => s.get(id));
+  const obtenirTous = (m) => requete(m, 'readonly', (s) => s.getAll());
+  const obtenirParDossier = (m, id) => requete(m, 'readonly', (s) => s.index('parDossier').getAll(id));
+  const supprimer = (m, id) => requete(m, 'readwrite', (s) => s.delete(id));
 
-  // Récupère tous les enregistrements d'un magasin
-  function obtenirTous(nomMagasin) {
-    return transaction(nomMagasin, 'readonly', (m) => m.getAll());
-  }
-
-  // Récupère tous les enregistrements liés à un dossier (via l'index)
-  function obtenirParDossier(nomMagasin, dossierId) {
-    return transaction(nomMagasin, 'readonly',
-      (m) => m.index('parDossier').getAll(dossierId));
-  }
-
-  // Supprime un enregistrement par son id
-  function supprimer(nomMagasin, id) {
-    return transaction(nomMagasin, 'readwrite', (m) => m.delete(id));
-  }
-
-  /* ------------------------------------------------------------------
-     Suppression complète d'un dossier : le dossier lui-même,
-     puis toutes ses photos et tous ses plans (sinon ils resteraient
-     "orphelins" et occuperaient de la place pour rien).
-     ------------------------------------------------------------------ */
-  async function supprimerDossierComplet(dossierId) {
+  async function prochainNumeroPhoto(dossierId) {
     const photos = await obtenirParDossier('photos', dossierId);
-    for (const photo of photos) await supprimer('photos', photo.id);
-
-    const plans = await obtenirParDossier('plans', dossierId);
-    for (const plan of plans) await supprimer('plans', plan.id);
-
-    await supprimer('dossiers', dossierId);
+    return photos.reduce((max, p) => Math.max(max, Number(p.numero) || 0), 0) + 1;
   }
 
-  // On expose uniquement ces fonctions au reste de l'application
-  return {
-    enregistrer,
-    obtenir,
-    obtenirTous,
-    obtenirParDossier,
-    supprimer,
-    supprimerDossierComplet,
-  };
+  async function migrerNumerosPhotos() {
+    const photos = await obtenirTous('photos');
+    const groupes = new Map();
+    for (const p of photos) {
+      if (!groupes.has(p.dossierId)) groupes.set(p.dossierId, []);
+      groupes.get(p.dossierId).push(p);
+    }
+    for (const groupe of groupes.values()) {
+      groupe.sort((a, b) => a.dateCreation - b.dateCreation);
+      const utilises = new Set(groupe.map((p) => Number(p.numero)).filter((n) => n > 0));
+      let suivant = 1;
+      for (const p of groupe) {
+        if (Number(p.numero) > 0) continue;
+        while (utilises.has(suivant)) suivant++;
+        p.numero = suivant;
+        utilises.add(suivant);
+        await enregistrer('photos', p);
+      }
+    }
+  }
 
+  async function supprimerPhotoComplete(photoId, dossierId) {
+    const plans = await obtenirParDossier('plans', dossierId);
+    await transaction(['photos', 'plans'], 'readwrite', (tx, store) => {
+      store('photos').delete(photoId);
+      for (const plan of plans) {
+        const avant = (plan.reperes || []).length;
+        plan.reperes = (plan.reperes || []).filter((r) => r.photoId !== photoId);
+        if (plan.reperes.length !== avant) store('plans').put(plan);
+      }
+    });
+  }
+
+  async function supprimerDossierComplet(dossierId) {
+    const [photos, plans] = await Promise.all([
+      obtenirParDossier('photos', dossierId), obtenirParDossier('plans', dossierId),
+    ]);
+    await transaction(['dossiers', 'photos', 'plans'], 'readwrite', (tx, store) => {
+      photos.forEach((p) => store('photos').delete(p.id));
+      plans.forEach((p) => store('plans').delete(p.id));
+      store('dossiers').delete(dossierId);
+    });
+  }
+
+  return {
+    ouvrir, enregistrer, obtenir, obtenirTous, obtenirParDossier, supprimer,
+    supprimerDossierComplet, supprimerPhotoComplete, prochainNumeroPhoto,
+    migrerNumerosPhotos,
+  };
 })();

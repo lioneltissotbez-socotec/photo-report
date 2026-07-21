@@ -12,7 +12,7 @@
   <link rel="icon" href="icons/icon-192.png">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
 
-  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/styles.css?v=2.1.3">
 </head>
 <body>
 
@@ -37,6 +37,13 @@
       <ul id="liste-dossiers" class="liste-dossiers"></ul>
 
       <!-- État vide : affiché uniquement quand il n'y a aucun dossier -->
+      <div class="barre-actions barre-actions--accueil">
+        <button id="btn-importer-sauvegarde" class="btn btn--secondaire" type="button">♻️ Restaurer une sauvegarde ZIP</button>
+      </div>
+      <input id="entree-sauvegarde" type="file" accept=".zip,application/zip" hidden>
+      <p id="import-sauvegarde-etat" class="indicateur-ajout" aria-live="polite" hidden></p>
+      <p id="stockage-etat" class="stockage-etat" aria-live="polite"></p>
+
       <div id="etat-vide" class="etat-vide" hidden>
         <div class="etat-vide__icone" aria-hidden="true">📁</div>
         <h2 class="etat-vide__titre">Aucun dossier pour l'instant</h2>
@@ -154,6 +161,33 @@
           <!-- Tags de type Remarque -->
           <p class="bloc__sous-titre">⚠️ Remarque</p>
           <div id="tags-remarque" class="tags-liste"></div>
+        </section>
+
+        <!-- ----- GÉOLOCALISATION DE LA PHOTO ----- -->
+        <section class="bloc bloc-photo-gps">
+          <div class="bloc__entete">
+            <h2 class="bloc__titre">Géolocalisation</h2>
+          </div>
+          <label class="photo-gps__activation">
+            <input id="photo-exterieure" type="checkbox">
+            <span>Photo extérieure géolocalisée</span>
+          </label>
+          <div id="photo-gps-zone" class="photo-gps__zone" hidden>
+            <button id="btn-geolocaliser-photo" class="btn btn--secondaire btn--pleine-largeur" type="button">
+              📍 Relever ma position
+            </button>
+            <div class="photo-gps__champs">
+              <label class="photo-gps__champ">
+                <span>Latitude (degrés décimaux)</span>
+                <input id="photo-latitude" type="text" inputmode="decimal" autocomplete="off" placeholder="47.123456">
+              </label>
+              <label class="photo-gps__champ">
+                <span>Longitude (degrés décimaux)</span>
+                <input id="photo-longitude" type="text" inputmode="decimal" autocomplete="off" placeholder="6.123456">
+              </label>
+            </div>
+            <p id="photo-gps-etat" class="photo-gps__etat" hidden></p>
+          </div>
         </section>
 
         <!-- ----- OBSERVATION ----- -->
@@ -613,23 +647,24 @@
   <!-- Les scripts sont chargés dans l'ordre des dépendances :
        db.js → (geo, camera, tags, dictee) → photos → dossiers → app -->
   <!-- Bibliothèque pdf.js (locale, pour lire les plans PDF hors ligne) -->
-  <script src="lib/pdf.min.js"></script>
+  <script src="lib/pdf.min.js?v=2.1.3"></script>
   <!-- jsPDF (génération PDF) et JSZip (archive), locales -->
-  <script src="lib/jspdf.umd.min.js"></script>
-  <script src="lib/jszip.min.js"></script>
+  <script src="lib/jspdf.umd.min.js?v=2.1.3"></script>
+  <script src="lib/jszip.min.js?v=2.1.3"></script>
 
-  <script src="js/db.js"></script>
-  <script src="js/geo.js"></script>
-  <script src="js/camera.js"></script>
-  <script src="js/predefinis.js"></script>
-  <script src="js/tags.js"></script>
-  <script src="js/dictee.js"></script>
-  <script src="js/annotate.js"></script>
-  <script src="js/carte.js"></script>
-  <script src="js/plans.js"></script>
-  <script src="js/photos.js"></script>
-  <script src="js/export.js"></script>
-  <script src="js/dossiers.js"></script>
-  <script src="js/app.js"></script>
+  <script src="js/db.js?v=2.1.3"></script>
+  <script src="js/geo.js?v=2.1.3"></script>
+  <script src="js/camera.js?v=2.1.3"></script>
+  <script src="js/predefinis.js?v=2.1.3"></script>
+  <script src="js/tags.js?v=2.1.3"></script>
+  <script src="js/dictee.js?v=2.1.3"></script>
+  <script src="js/annotate.js?v=2.1.3"></script>
+  <script src="js/carte.js?v=2.1.3"></script>
+  <script src="js/plans.js?v=2.1.3"></script>
+  <script src="js/photos.js?v=2.1.3"></script>
+  <script src="js/export.js?v=2.1.3"></script>
+  <script src="js/backup.js?v=2.1.3"></script>
+  <script src="js/dossiers.js?v=2.1.3"></script>
+  <script src="js/app.js?v=2.1.3"></script>
 </body>
 </html>

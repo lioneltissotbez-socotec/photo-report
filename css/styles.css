@@ -1283,3 +1283,18 @@ button:focus-visible, input:focus-visible {
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
 }
+
+/* Version 2.1 — sauvegarde et suivi du stockage */
+.barre-actions--accueil { margin: 0 0 12px; }
+.stockage-etat { margin: 6px 0 14px; font-size: .82rem; color: var(--couleur-texte-secondaire, #667788); }
+
+
+/* Version 2.1.3 — géolocalisation des photos extérieures */
+.photo-gps__activation { display:flex; align-items:center; gap:10px; font-weight:700; cursor:pointer; }
+.photo-gps__activation input { width:20px; height:20px; flex:0 0 auto; }
+.photo-gps__zone { margin-top:12px; }
+.photo-gps__champs { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; margin-top:10px; }
+.photo-gps__champ { display:flex; flex-direction:column; gap:5px; font-size:.78rem; font-weight:700; color:var(--encre-douce); }
+.photo-gps__champ input { width:100%; min-height:44px; box-sizing:border-box; border:1px solid #B8C5D1; border-radius:8px; padding:9px 10px; font:inherit; color:#14283A; background:#FFF; }
+.photo-gps__etat { margin:9px 0 0; font-size:.82rem; color:var(--encre-douce); line-height:1.35; }
+@media (max-width:520px) { .photo-gps__champs { grid-template-columns:1fr; } }

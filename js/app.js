@@ -47,7 +47,21 @@ const App = (() => {
   /* ------------------------------------------------------------------
      DÉMARRAGE
      ------------------------------------------------------------------ */
-  async function demarrer() {
+  async function afficherStockage() {
+    const zone = document.getElementById('stockage-etat');
+    if (!zone || !navigator.storage?.estimate) return;
+    try {
+      const { usage = 0, quota = 0 } = await navigator.storage.estimate();
+      const mo = (usage / 1024 / 1024).toFixed(1);
+      const total = quota ? (quota / 1024 / 1024).toFixed(0) : '?';
+      zone.textContent = `Stockage utilisé : ${mo} Mo sur environ ${total} Mo`;
+    } catch (_) { zone.textContent = ''; }
+  }
+
+  function initialiserInterface() {
+    // Les branchements de l’interface ne doivent jamais dépendre d’une
+    // migration IndexedDB. Ainsi les boutons restent utilisables même si
+    // une ancienne base est momentanément bloquée ou si une migration échoue.
     Dossiers.initialiser();
     Photos.initialiser();
     Camera.initialiser();
@@ -57,9 +71,33 @@ const App = (() => {
     Plans.initialiser();
     Carte.initialiser();
     Export.initialiser();
-    await Dossiers.afficherListe();
+    Backup.initialiser();
     surveillerReseau();
     enregistrerServiceWorker();
+  }
+
+  async function demarrer() {
+    initialiserInterface();
+
+    try {
+      await DB.ouvrir();
+      await Dossiers.afficherListe();
+
+      // La numérotation permanente est une migration de confort : elle ne
+      // doit pas empêcher l’affichage des missions historiques.
+      DB.migrerNumerosPhotos()
+        .then(() => Dossiers.afficherListe())
+        .catch((erreur) => console.warn('Migration des numéros non bloquante :', erreur));
+    } catch (erreur) {
+      console.error('Impossible d’ouvrir la base existante :', erreur);
+      const vide = document.getElementById('etat-vide');
+      if (vide) {
+        vide.hidden = false;
+        vide.textContent = 'La base locale n’a pas pu être ouverte. Fermez les autres onglets de l’application puis rechargez la page.';
+      }
+    }
+
+    await afficherStockage();
   }
 
   // Lance l'app une fois le HTML entièrement chargé

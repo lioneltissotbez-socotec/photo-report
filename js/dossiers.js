@@ -129,6 +129,9 @@ const Dossiers = (() => {
      ------------------------------------------------------------------ */
   async function creerDossier(evenement) {
     evenement.preventDefault(); // empêche le rechargement de la page
+    const bouton = formulaire.querySelector('[type="submit"]');
+    const texteInitial = bouton?.textContent || 'Créer le dossier';
+    if (bouton) { bouton.disabled = true; bouton.textContent = 'Création…'; }
 
     const maintenant = Date.now();
     const dossier = {
@@ -148,13 +151,19 @@ const Dossiers = (() => {
       dateModification: maintenant,
     };
 
-    await DB.enregistrer('dossiers', dossier);
-
-    formulaire.reset();
-    coordonneesGPS = null;                                    // remet à zéro pour le prochain dossier
-    document.getElementById('localisation-etat').hidden = true;
-    dialogueNouveau.close();
-    await afficherListe();
+    try {
+      await DB.enregistrer('dossiers', dossier);
+      formulaire.reset();
+      coordonneesGPS = null;                                    // remet à zéro pour le prochain dossier
+      document.getElementById('localisation-etat').hidden = true;
+      dialogueNouveau.close();
+      await afficherListe();
+    } catch (erreur) {
+      console.error('Création du dossier impossible :', erreur);
+      alert(`Impossible de créer le dossier. ${erreur.message || erreur}`);
+    } finally {
+      if (bouton) { bouton.disabled = false; bouton.textContent = texteInitial; }
+    }
   }
 
   /* ------------------------------------------------------------------
