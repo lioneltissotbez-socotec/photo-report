@@ -140,6 +140,18 @@ const Photos = (() => {
       const element = document.createElement('li');
       element.className = 'grille-photos__case';
       element.innerHTML = `<img src="${url}" alt="Vignette" loading="lazy">`;
+
+      // Pastille(s) de numéro de repère dans le coin, si la photo est
+      // pointée depuis un ou plusieurs plans
+      const reperes = await Plans.reperesDeLaPhoto(dossierCourant.id, photo.id);
+      if (reperes.length > 0) {
+        const numeros = reperes.map((r) => r.numero).join('·');
+        const pastille = document.createElement('span');
+        pastille.className = 'case-numero';
+        pastille.textContent = numeros;
+        element.appendChild(pastille);
+      }
+
       element.addEventListener('click', () => ouvrirPhoto(photo));
       grille.appendChild(element);
     }

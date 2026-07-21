@@ -501,6 +501,18 @@ const Plans = (() => {
       entreePlan.value = '';
     });
 
+    // Capture d'une carte comme plan
+    document.getElementById('btn-capturer-carte')
+      .addEventListener('click', () => {
+        Carte.ouvrir(async (blob) => {
+          // Le blob capturé devient un plan (même traitement qu'une image)
+          const nom = 'Carte ' + new Date().toLocaleDateString('fr-FR');
+          await creerPlanDepuisImage(blob, nom);
+          App.montrerEcran('ecran-plans');
+          await afficherGrillePlans();
+        });
+      });
+
     // Navigation
     document.getElementById('btn-retour-dossier-2')
       .addEventListener('click', () => App.montrerEcran('ecran-dossier'));

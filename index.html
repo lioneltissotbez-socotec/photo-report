@@ -352,6 +352,9 @@
       <button id="btn-importer-plan" class="btn btn--principal btn--pleine-largeur btn--large" type="button">
         📄 Importer un plan (image ou PDF)
       </button>
+      <button id="btn-capturer-carte" class="btn btn--secondaire btn--pleine-largeur btn--large" type="button">
+        🛰️ Capturer une carte (plan / satellite)
+      </button>
       <p id="indicateur-plan" class="indicateur-ajout" hidden>Import du plan en cours…</p>
 
       <ul id="grille-plans" class="grille-plans"></ul>
@@ -446,6 +449,52 @@
     </div>
   </dialog>
 
+  <!-- ================================================================
+       ÉCRAN CAPTURE DE CARTE
+       Une carte navigable dont les tuiles sont assemblées sur un canvas.
+       On cadre la zone, on choisit plan ou satellite, puis on capture
+       la vue comme un plan (image) avec repères.
+       ================================================================ -->
+  <section id="ecran-carte" class="ecran ecran--sombre">
+
+    <header class="barre">
+      <button id="btn-fermer-carte" class="btn-retour" type="button" aria-label="Fermer la carte">←</button>
+      <div class="barre__titres">
+        <h1 class="barre__titre">Capturer une carte</h1>
+        <p class="barre__sous-titre">Cadrez la zone, puis capturez</p>
+      </div>
+    </header>
+
+    <!-- Recherche + choix du fond -->
+    <div class="carte-controles">
+      <div class="carte-recherche">
+        <input id="carte-adresse" type="text" placeholder="Adresse ou lieu…" autocomplete="off">
+        <button id="btn-carte-chercher" class="btn btn--principal" type="button">🔍</button>
+        <button id="btn-carte-gps" class="btn btn--secondaire" type="button" aria-label="Ma position">📍</button>
+      </div>
+      <div class="carte-fonds">
+        <button class="carte-fond carte-fond--actif" data-fond="plan" type="button">🗺️ Plan</button>
+        <button class="carte-fond" data-fond="satellite" type="button">🛰️ Satellite</button>
+      </div>
+    </div>
+
+    <!-- La carte : un canvas sur lequel on assemble les tuiles -->
+    <main class="carte-vue">
+      <canvas id="carte-canvas" class="carte-canvas"></canvas>
+      <div class="carte-mire" aria-hidden="true">✛</div>
+      <p id="carte-attribution" class="carte-attribution"></p>
+      <p id="carte-message" class="carte-message" hidden></p>
+    </main>
+
+    <!-- Barre du bas : zoom + capture -->
+    <div class="carte-barre">
+      <button id="btn-carte-moins" class="btn btn--secondaire carte-zoom" type="button" aria-label="Dézoomer">−</button>
+      <span id="carte-niveau" class="carte-niveau">z15</span>
+      <button id="btn-carte-plus" class="btn btn--secondaire carte-zoom" type="button" aria-label="Zoomer">+</button>
+      <button id="btn-carte-capturer" class="btn btn--jaune carte-capture" type="button">📸 Capturer comme plan</button>
+    </div>
+  </section>
+
   <!-- FENÊTRE : confirmation suppression plan -->
   <dialog id="dialogue-supprimer-plan" class="dialogue">
     <div class="dialogue__contenu">
@@ -504,6 +553,7 @@
   <script src="js/tags.js"></script>
   <script src="js/dictee.js"></script>
   <script src="js/annotate.js"></script>
+  <script src="js/carte.js"></script>
   <script src="js/plans.js"></script>
   <script src="js/photos.js"></script>
   <script src="js/dossiers.js"></script>

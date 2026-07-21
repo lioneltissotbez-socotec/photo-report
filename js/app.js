@@ -55,6 +55,7 @@ const App = (() => {
     Dictee.initialiser();
     Annotate.initialiser();
     Plans.initialiser();
+    Carte.initialiser();
     await Dossiers.afficherListe();
     surveillerReseau();
     enregistrerServiceWorker();

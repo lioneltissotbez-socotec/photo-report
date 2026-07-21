@@ -389,6 +389,27 @@ body {
   display: block;
 }
 
+/* Pastille de numéro de repère dans le coin de la vignette */
+.grille-photos__case { position: relative; }
+.case-numero {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--bleu-action);
+  color: #FFFFFF;
+  font-size: 0.72rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #FFFFFF;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+}
+
 /* --------------------- Fiche photo (écran photo) -------------------- */
 .ecran--sombre { background: #10161C; }
 .ecran--sombre .barre { background: #060A0E; }
@@ -1054,6 +1075,131 @@ body {
   padding: 10px;
   cursor: pointer;
 }
+
+/* ====================================================================
+   Écran capture de carte
+   ==================================================================== */
+#ecran-carte.ecran--visible {
+  height: 100dvh;
+  min-height: 0;
+  max-height: 100dvh;
+  overflow: hidden;
+}
+.ecran--carte, #ecran-carte { background: #10161C; }
+
+.carte-controles {
+  flex-shrink: 0;
+  background: #1A2129;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.carte-recherche { display: flex; gap: 8px; }
+.carte-recherche input {
+  flex: 1;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 10px;
+  font-size: 1rem;
+  font-family: inherit;
+}
+.carte-recherche .btn { min-height: 44px; padding: 0 14px; }
+
+.carte-fonds { display: flex; gap: 8px; }
+.carte-fond {
+  flex: 1;
+  border: none;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.10);
+  color: #FFFFFF;
+  font-weight: 700;
+  font-size: 0.9rem;
+  font-family: inherit;
+  padding: 10px;
+  cursor: pointer;
+}
+.carte-fond--actif { background: var(--bleu-action); }
+
+/* Zone carte */
+.carte-vue {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  overflow: hidden;
+  background: #DDE4EA;
+}
+.carte-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none;    /* on gère nous-mêmes le déplacement */
+  cursor: grab;
+}
+.carte-canvas:active { cursor: grabbing; }
+
+/* Croix de visée au centre : indique le point capturé au centre */
+.carte-mire {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 1.8rem;
+  color: rgba(192, 57, 43, 0.9);
+  text-shadow: 0 0 3px #FFFFFF;
+  pointer-events: none;
+}
+
+.carte-attribution {
+  position: absolute;
+  bottom: 4px;
+  right: 6px;
+  font-size: 0.7rem;
+  color: #333333;
+  background: rgba(255, 255, 255, 0.75);
+  padding: 2px 6px;
+  border-radius: 4px;
+  pointer-events: none;
+}
+.carte-message {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(15, 44, 74, 0.9);
+  color: #FFFFFF;
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 8px 16px;
+  border-radius: 999px;
+}
+
+/* Barre du bas */
+.carte-barre {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  padding-bottom: calc(12px + env(safe-area-inset-bottom));
+  background: #1A2129;
+}
+.carte-zoom {
+  width: 48px;
+  min-height: 48px;
+  font-size: 1.5rem;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+.carte-niveau {
+  color: #FFFFFF;
+  font-weight: 700;
+  font-size: 0.85rem;
+  min-width: 34px;
+  text-align: center;
+}
+.carte-capture { flex: 1; min-height: 48px; font-weight: 800; }
 
 /* ------------------- Accessibilité clavier ------------------------- */
 button:focus-visible, input:focus-visible {
