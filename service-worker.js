@@ -15,7 +15,7 @@
    garderaient l'ancienne version en cache).
    ==================================================================== */
 
-const VERSION_CACHE = 'reportage-photo-v14';
+const VERSION_CACHE = 'reportage-photo-v16';
 
 const FICHIERS_APP = [
   './',

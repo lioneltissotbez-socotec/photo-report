@@ -289,6 +289,16 @@
          le CSS le met à l'échelle pour tenir dans la zone. -->
     <main class="zone-dessin">
       <canvas id="canvas-annotation" class="canvas-annotation"></canvas>
+
+      <!-- Boutons de zoom (surtout utiles sur Windows ; sur mobile on pince) -->
+      <div class="zoom-boutons">
+        <button id="btn-zoom-plus" class="zoom-bouton" type="button" aria-label="Zoomer">+</button>
+        <button id="btn-zoom-moins" class="zoom-bouton" type="button" aria-label="Dézoomer">−</button>
+        <button id="btn-zoom-reset" class="zoom-bouton zoom-bouton--reset" type="button" aria-label="Réinitialiser le zoom">⤢</button>
+      </div>
+
+      <!-- Loupe déportée : montre ce qui est sous le doigt pendant le tracé -->
+      <canvas id="loupe" class="loupe" width="140" height="140" hidden></canvas>
     </main>
 
     <!-- Barre d'outils en bas -->

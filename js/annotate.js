@@ -45,6 +45,24 @@ const Annotate = (() => {
   let historique = [];
   let positionHistorique = -1;
 
+  /* ---- Zoom / déplacement de la vue ----
+     La vue est positionnée par une transformation CSS appliquée au canvas :
+       translate(vueX, vueY) puis scale(vueEchelle), origine en haut-gauche.
+     Le canvas garde sa résolution réelle (taille de l'image) ; seule son
+     apparence à l'écran change. La conversion doigt→image continue de
+     fonctionner car getBoundingClientRect reflète cette transformation. */
+  let vueEchelle = 1;   // 1 = image ajustée à la zone
+  let vueX = 0;         // décalage horizontal à l'écran (px)
+  let vueY = 0;         // décalage vertical à l'écran (px)
+  let ajustEchelle = 1; // échelle d'ajustement de base (image → zone)
+  let ajustL = 0, ajustH = 0; // dimensions ajustées de base
+
+  // Suivi des doigts/pointeurs actifs (pour distinguer 1 doigt = dessin,
+  // 2 doigts = navigation pincer/déplacer)
+  const pointeurs = new Map();
+  let pincementDepart = null; // état au début d'un geste à deux doigts
+  let espaceEnfonce = false;  // touche Espace maintenue (déplacement souris)
+
   /* ==================================================================
      OUVERTURE DE L'ÉDITEUR
      ================================================================== */
@@ -60,6 +78,9 @@ const Annotate = (() => {
     historique = [copie(annotations)];
     positionHistorique = 0;
     selection = null;
+    pointeurs.clear();
+    pincementDepart = null;
+    masquerLoupe();
 
     // Charge l'image de fond depuis le Blob stocké
     const url = URL.createObjectURL(photo.image);
@@ -69,12 +90,78 @@ const Annotate = (() => {
       // Le canvas prend la taille réelle de l'image
       canvas.width = image.naturalWidth;
       canvas.height = image.naturalHeight;
+      reinitialiserVue();   // ajuste et centre l'image dans la zone
       redessiner();
     };
     image.src = url;
 
     majBarreOutils();
     App.montrerEcran('ecran-annotation');
+  }
+
+  /* ==================================================================
+     VUE : ajustement, centrage, zoom, déplacement
+     ================================================================== */
+
+  /* Calcule l'échelle d'ajustement (image → zone) et centre l'image */
+  function reinitialiserVue() {
+    const zone = document.querySelector('.zone-dessin');
+    const rz = zone.getBoundingClientRect();
+
+    // Échelle pour que l'image entière tienne dans la zone
+    ajustEchelle = Math.min(rz.width / canvas.width, rz.height / canvas.height);
+    ajustL = canvas.width * ajustEchelle;
+    ajustH = canvas.height * ajustEchelle;
+
+    vueEchelle = 1;
+    // Centre l'image dans la zone
+    vueX = (rz.width - ajustL) / 2;
+    vueY = (rz.height - ajustH) / 2;
+    appliquerVue();
+  }
+
+  /* Applique la transformation CSS au canvas.
+     Taille affichée = ajustL × vueEchelle (idem hauteur). */
+  function appliquerVue() {
+    // Largeur/hauteur CSS de base (avant zoom) : l'image ajustée
+    canvas.style.width = ajustL + 'px';
+    canvas.style.height = ajustH + 'px';
+    canvas.style.transformOrigin = '0 0';
+    canvas.style.transform =
+      `translate(${vueX}px, ${vueY}px) scale(${vueEchelle})`;
+  }
+
+  /* Zoom autour d'un point d'ancrage (en pixels écran relatifs à la zone),
+     pour que ce point reste immobile pendant le zoom. */
+  function zoomerVue(facteur, ancreX, ancreY) {
+    const nouvelleEchelle = Math.max(1, Math.min(8, vueEchelle * facteur));
+    const ratio = nouvelleEchelle / vueEchelle;
+    // Ajuste le décalage pour garder le point d'ancrage fixe
+    vueX = ancreX - (ancreX - vueX) * ratio;
+    vueY = ancreY - (ancreY - vueY) * ratio;
+    vueEchelle = nouvelleEchelle;
+    contraindreVue();
+    appliquerVue();
+  }
+
+  /* Empêche de trop faire glisser l'image hors de la zone */
+  function contraindreVue() {
+    const zone = document.querySelector('.zone-dessin');
+    const rz = zone.getBoundingClientRect();
+    const largeurAff = ajustL * vueEchelle;
+    const hauteurAff = ajustH * vueEchelle;
+
+    // Marge autorisée : au moins un quart de la zone reste couvert
+    if (largeurAff <= rz.width) {
+      vueX = (rz.width - largeurAff) / 2; // recentre si plus petit que la zone
+    } else {
+      vueX = Math.min(0, Math.max(rz.width - largeurAff, vueX));
+    }
+    if (hauteurAff <= rz.height) {
+      vueY = (rz.height - hauteurAff) / 2;
+    } else {
+      vueY = Math.min(0, Math.max(rz.height - hauteurAff, vueY));
+    }
   }
 
   /* ==================================================================
@@ -199,28 +286,147 @@ const Annotate = (() => {
     };
   }
 
+  /* Vrai seulement si le point est à l'intérieur de l'image. Empêche de
+     créer une annotation en touchant en dehors (marges, barre d'outils). */
+  function pointDansImage(p) {
+    return p.x >= 0 && p.x <= canvas.width && p.y >= 0 && p.y <= canvas.height;
+  }
+
+  /* Point d'un événement en coordonnées ÉCRAN relatives à la zone */
+  function pointEcran(e) {
+    const zone = document.querySelector('.zone-dessin').getBoundingClientRect();
+    return { x: e.clientX - zone.left, y: e.clientY - zone.top };
+  }
+
   /* ==================================================================
      GESTES : début, déplacement, fin
+     Un doigt = dessin (ou déplacement de forme). Deux doigts = navigation
+     (pincer pour zoomer + glisser pour déplacer). Sur souris : Espace
+     maintenu = déplacement.
      ================================================================== */
   function auDebut(e) {
+    // Enregistre ce pointeur (pour compter les doigts)
+    pointeurs.set(e.pointerId, { x: e.clientX, y: e.clientY, type: e.pointerType });
+
+    // Deux doigts → on démarre/rafraîchit le geste de navigation
+    if (pointeurs.size === 2) {
+      demarrerPincement();
+      annulerFormeEnCours();
+      return;
+    }
+    if (pointeurs.size > 2) return;
+
+    // Souris + Espace → déplacement de la vue (pas de dessin)
+    if (espaceEnfonce && e.pointerType === 'mouse') {
+      e.preventDefault();
+      canvas.setPointerCapture(e.pointerId);
+      pointDepart = pointEcran(e);
+      enCours = 'pan';
+      return;
+    }
+
+    const p = pointDepuisEvenement(e);
+    // Ignore tout geste qui commence en dehors de l'image
+    if (!pointDansImage(p)) { enCours = false; return; }
+
     e.preventDefault();
     canvas.setPointerCapture(e.pointerId);
-    const p = pointDepuisEvenement(e);
     pointDepart = p;
     enCours = true;
 
     if (outil === 'selection') {
-      // On cherche la forme sous le doigt (de la plus récente à la plus ancienne)
       selection = trouverFormeSous(p);
       majBoutonSupprimer();
       redessiner();
       return;
     }
 
+    // L'outil texte agit au relâchement (auFin)
+    if (outil === 'texte') { majLoupe(e, p); return; }
+
+    // Outils de dessin : on démarre une nouvelle forme
+    if (outil === 'trace') {
+      formeEnCours = { id: crypto.randomUUID(), type: 'trace',
+        points: [p], couleur, epaisseur, style: styleTrait };
+    } else {
+      formeEnCours = { id: crypto.randomUUID(), type: outil,
+        x1: p.x, y1: p.y, x2: p.x, y2: p.y,
+        couleur, epaisseur, style: styleTrait,
+        pointe: outil === 'fleche' ? typePointe : undefined };
+    }
+    majLoupe(e, p);
+  }
+
+  function auDeplacement(e) {
+    // Met à jour la position mémorisée de ce pointeur
+    if (pointeurs.has(e.pointerId)) {
+      const info = pointeurs.get(e.pointerId);
+      info.x = e.clientX; info.y = e.clientY;
+    }
+
+    // Navigation à deux doigts
+    if (pointeurs.size === 2) { majPincement(); return; }
+
+    if (!enCours) return;
+    e.preventDefault();
+
+    // Déplacement de la vue (souris + Espace)
+    if (enCours === 'pan') {
+      const pe = pointEcran(e);
+      vueX += pe.x - pointDepart.x;
+      vueY += pe.y - pointDepart.y;
+      pointDepart = pe;
+      contraindreVue();
+      appliquerVue();
+      return;
+    }
+
+    const p = pointDepuisEvenement(e);
+
+    if (outil === 'selection') {
+      if (selection && pointDepart) {
+        deplacerForme(selection, p.x - pointDepart.x, p.y - pointDepart.y);
+        pointDepart = p;
+        redessiner();
+      }
+      return;
+    }
+
+    if (outil === 'texte') { majLoupe(e, p); return; }
+
+    if (!formeEnCours) return;
+    if (formeEnCours.type === 'trace') {
+      formeEnCours.points.push(p);
+    } else {
+      formeEnCours.x2 = p.x;
+      formeEnCours.y2 = p.y;
+    }
+    redessiner();
+    majLoupe(e, p);
+  }
+
+  function auFin(e) {
+    pointeurs.delete(e.pointerId);
+    // Fin d'un geste à deux doigts
+    if (pointeurs.size < 2) pincementDepart = null;
+
+    if (!enCours) { masquerLoupe(); return; }
+    const etait = enCours;
+    enCours = false;
+    masquerLoupe();
+
+    if (etait === 'pan') return;
+
+    if (outil === 'selection') {
+      if (selection) enregistrerEtape();
+      return;
+    }
+
+    // Outil texte : invite au relâchement, si le point est dans l'image
     if (outil === 'texte') {
-      // Saisie du texte via une invite simple
+      const p = pointDepart;
+      if (!p || !pointDansImage(p)) return;
       const saisie = prompt('Texte à ajouter :');
-      enCours = false;
       if (saisie && saisie.trim()) {
         annotations.push({
           id: crypto.randomUUID(), type: 'texte',
@@ -233,55 +439,7 @@ const Annotate = (() => {
       return;
     }
 
-    // Outils de dessin : on démarre une nouvelle forme
-    if (outil === 'trace') {
-      formeEnCours = { id: crypto.randomUUID(), type: 'trace',
-        points: [p], couleur, epaisseur, style: styleTrait };
-    } else {
-      formeEnCours = { id: crypto.randomUUID(), type: outil,
-        x1: p.x, y1: p.y, x2: p.x, y2: p.y,
-        couleur, epaisseur, style: styleTrait,
-        pointe: outil === 'fleche' ? typePointe : undefined };
-    }
-  }
-
-  function auDeplacement(e) {
-    if (!enCours) return;
-    e.preventDefault();
-    const p = pointDepuisEvenement(e);
-
-    if (outil === 'selection') {
-      if (selection && pointDepart) {
-        // Déplace la forme du delta parcouru
-        deplacerForme(selection, p.x - pointDepart.x, p.y - pointDepart.y);
-        pointDepart = p;
-        redessiner();
-      }
-      return;
-    }
-
-    if (!formeEnCours) return;
-    if (formeEnCours.type === 'trace') {
-      formeEnCours.points.push(p);
-    } else {
-      formeEnCours.x2 = p.x;
-      formeEnCours.y2 = p.y;
-    }
-    redessiner();
-  }
-
-  function auFin(e) {
-    if (!enCours) return;
-    enCours = false;
-
-    if (outil === 'selection') {
-      // Si on a déplacé une forme, on enregistre l'étape
-      if (selection) enregistrerEtape();
-      return;
-    }
-
     if (formeEnCours) {
-      // On ignore les formes trop petites (clic sans glissement)
       if (formeSignificative(formeEnCours)) {
         annotations.push(formeEnCours);
         enregistrerEtape();
@@ -289,6 +447,113 @@ const Annotate = (() => {
       formeEnCours = null;
       redessiner();
     }
+  }
+
+  function annulerFormeEnCours() {
+    // Quand on passe à deux doigts, on abandonne un éventuel tracé commencé
+    formeEnCours = null;
+    enCours = false;
+    masquerLoupe();
+    redessiner();
+  }
+
+  /* ---- Navigation à deux doigts (pincer + déplacer) ---- */
+  function deuxPoints() {
+    const pts = [...pointeurs.values()];
+    return pts.slice(0, 2);
+  }
+  function demarrerPincement() {
+    const [a, b] = deuxPoints();
+    const zone = document.querySelector('.zone-dessin').getBoundingClientRect();
+    pincementDepart = {
+      distance: Math.hypot(a.x - b.x, a.y - b.y),
+      centreX: (a.x + b.x) / 2 - zone.left,
+      centreY: (a.y + b.y) / 2 - zone.top,
+      echelle: vueEchelle,
+    };
+  }
+  function majPincement() {
+    if (!pincementDepart) { demarrerPincement(); return; }
+    const [a, b] = deuxPoints();
+    const zone = document.querySelector('.zone-dessin').getBoundingClientRect();
+    const distance = Math.hypot(a.x - b.x, a.y - b.y);
+    const centreX = (a.x + b.x) / 2 - zone.left;
+    const centreY = (a.y + b.y) / 2 - zone.top;
+
+    // Zoom relatif au pincement de départ, autour du centre des deux doigts
+    const facteur = distance / pincementDepart.distance;
+    const cible = Math.max(1, Math.min(8, pincementDepart.echelle * facteur));
+    const ratio = cible / vueEchelle;
+    vueX = centreX - (centreX - vueX) * ratio;
+    vueY = centreY - (centreY - vueY) * ratio;
+    vueEchelle = cible;
+
+    // Déplacement (glissement des deux doigts)
+    vueX += centreX - pincementDepart.centreX;
+    vueY += centreY - pincementDepart.centreY;
+    pincementDepart.centreX = centreX;
+    pincementDepart.centreY = centreY;
+    pincementDepart.distance = distance;
+    pincementDepart.echelle = vueEchelle;
+
+    contraindreVue();
+    appliquerVue();
+  }
+
+  /* ==================================================================
+     LOUPE DÉPORTÉE : montre la zone sous le doigt, agrandie, avec un
+     réticule. N'apparaît qu'au doigt ou au stylet (pas à la souris,
+     qui ne cache rien). Se place dans le coin opposé au doigt.
+     ================================================================== */
+  const loupe = document.getElementById('loupe');
+  const loupeCtx = loupe ? loupe.getContext('2d') : null;
+  const LOUPE_TAILLE = 140;      // taille affichée de la loupe (px)
+  const LOUPE_SOURCE = 90;       // portion d'image copiée (px image) → agrandissement
+
+  function majLoupe(e, pImage) {
+    // Uniquement au doigt/stylet
+    if (!loupe || (e.pointerType !== 'touch' && e.pointerType !== 'pen')) return;
+
+    loupe.hidden = false;
+    loupeCtx.clearRect(0, 0, LOUPE_TAILLE, LOUPE_TAILLE);
+    loupeCtx.save();
+
+    // Copie une portion du canvas (photo + annotations en cours) centrée
+    // sur le point visé, agrandie dans la loupe.
+    const sx = pImage.x - LOUPE_SOURCE / 2;
+    const sy = pImage.y - LOUPE_SOURCE / 2;
+    // Fond blanc au cas où on déborde de l'image
+    loupeCtx.fillStyle = '#FFFFFF';
+    loupeCtx.fillRect(0, 0, LOUPE_TAILLE, LOUPE_TAILLE);
+    loupeCtx.drawImage(canvas, sx, sy, LOUPE_SOURCE, LOUPE_SOURCE,
+      0, 0, LOUPE_TAILLE, LOUPE_TAILLE);
+
+    // Réticule de visée au centre
+    loupeCtx.strokeStyle = 'rgba(192,57,43,0.9)';
+    loupeCtx.lineWidth = 1.5;
+    loupeCtx.beginPath();
+    loupeCtx.moveTo(LOUPE_TAILLE / 2, LOUPE_TAILLE / 2 - 12);
+    loupeCtx.lineTo(LOUPE_TAILLE / 2, LOUPE_TAILLE / 2 + 12);
+    loupeCtx.moveTo(LOUPE_TAILLE / 2 - 12, LOUPE_TAILLE / 2);
+    loupeCtx.lineTo(LOUPE_TAILLE / 2 + 12, LOUPE_TAILLE / 2);
+    loupeCtx.stroke();
+    loupeCtx.restore();
+
+    // Place la loupe dans le coin opposé au doigt (pour ne pas être cachée)
+    const zone = document.querySelector('.zone-dessin').getBoundingClientRect();
+    const doigtX = e.clientX - zone.left;
+    const aGauche = doigtX < zone.width / 2;
+    loupe.style.left = aGauche ? 'auto' : '12px';
+    loupe.style.right = aGauche ? '12px' : 'auto';
+  }
+
+  function masquerLoupe() {
+    if (loupe) loupe.hidden = true;
+  }
+
+  /* Vrai si l'écran d'annotation est actuellement affiché */
+  function estEcranAnnotationVisible() {
+    return document.getElementById('ecran-annotation').classList.contains('ecran--visible');
   }
 
   /* Vraie forme (évite d'ajouter un point isolé par accident) */
@@ -484,6 +749,35 @@ const Annotate = (() => {
     canvas.addEventListener('pointermove', auDeplacement);
     canvas.addEventListener('pointerup', auFin);
     canvas.addEventListener('pointercancel', auFin);
+
+    // --- Zoom : boutons +/− et réinitialisation ---
+    const zone = () => document.querySelector('.zone-dessin').getBoundingClientRect();
+    document.getElementById('btn-zoom-plus').addEventListener('click', () => {
+      const z = zone(); zoomerVue(1.4, z.width / 2, z.height / 2);
+    });
+    document.getElementById('btn-zoom-moins').addEventListener('click', () => {
+      const z = zone(); zoomerVue(1 / 1.4, z.width / 2, z.height / 2);
+    });
+    document.getElementById('btn-zoom-reset').addEventListener('click', reinitialiserVue);
+
+    // --- Zoom à la molette (souris) ---
+    canvas.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      const z = document.querySelector('.zone-dessin').getBoundingClientRect();
+      zoomerVue(e.deltaY < 0 ? 1.15 : 1 / 1.15, e.clientX - z.left, e.clientY - z.top);
+    }, { passive: false });
+
+    // --- Touche Espace maintenue = déplacement à la souris ---
+    document.addEventListener('keydown', (e) => {
+      if (e.code === 'Space' && estEcranAnnotationVisible()) {
+        espaceEnfonce = true;
+        canvas.style.cursor = 'grab';
+        e.preventDefault();
+      }
+    });
+    document.addEventListener('keyup', (e) => {
+      if (e.code === 'Space') { espaceEnfonce = false; canvas.style.cursor = ''; }
+    });
 
     // --- Sélection d'outil ---
     document.querySelectorAll('.outil[data-outil]').forEach((bouton) => {

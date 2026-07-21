@@ -749,22 +749,61 @@ body {
 .zone-dessin {
   flex: 1;
   min-height: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  padding: 8px;
+  position: relative;   /* repère pour le canvas positionné en absolu */
+  overflow: hidden;     /* masque les débordements quand on zoome */
+  padding: 0;
+  background: #10161C;
 }
 
 .canvas-annotation {
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: contain;
-  /* touch-action:none = indispensable : empêche le navigateur de faire
-     défiler/zoomer pendant qu'on dessine au doigt */
-  touch-action: none;
+  position: absolute;
+  top: 0;
+  left: 0;
+  /* La taille et la position sont pilotées par annotate.js
+     (style.width/height + transform). */
+  touch-action: none;   /* on gère nous-mêmes doigt/pincer */
   background: #000000;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+}
+
+/* Boutons de zoom, en surimpression en bas à gauche de la zone */
+.zoom-boutons {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 5;
+}
+.zoom-bouton {
+  width: 46px;
+  height: 46px;
+  border: none;
+  border-radius: 12px;
+  background: rgba(26, 33, 41, 0.85);
+  color: #FFFFFF;
+  font-size: 1.5rem;
+  font-weight: 800;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.zoom-bouton--reset { font-size: 1.2rem; }
+
+/* Loupe déportée */
+.loupe {
+  position: absolute;
+  top: 12px;
+  width: 140px;
+  height: 140px;
+  border-radius: 50%;
+  border: 3px solid #FFFFFF;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+  z-index: 6;
+  pointer-events: none;   /* ne gêne jamais le dessin */
+  background: #FFFFFF;
 }
 
 /* --------------------------- Barre d'outils ------------------------ */
