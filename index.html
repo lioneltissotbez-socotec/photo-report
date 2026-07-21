@@ -99,8 +99,8 @@
   </section>
 
   <!-- ================================================================
-       ÉCRAN 3 : PHOTO — visionneuse plein écran
-       (les tags, observations et l'annotation arriveront aux étapes 3 et 4)
+       ÉCRAN 3 : PHOTO — visionneuse + tags + observation
+       (l'annotation arrivera à l'étape 4)
        ================================================================ -->
   <section id="ecran-photo" class="ecran ecran--sombre">
 
@@ -113,8 +113,42 @@
       <button id="btn-supprimer-photo" class="btn-retour" type="button" aria-label="Supprimer la photo">🗑</button>
     </header>
 
-    <main class="visionneuse">
-      <img id="photo-pleine" class="visionneuse__image" alt="Photo du reportage">
+    <!-- Zone défilante : la photo en haut, puis tags et observation -->
+    <main class="fiche-photo">
+      <div class="fiche-photo__image-cadre">
+        <img id="photo-pleine" class="fiche-photo__image" alt="Photo du reportage">
+      </div>
+
+      <div class="fiche-photo__panneau">
+
+        <!-- ----- TAGS ----- -->
+        <section class="bloc">
+          <div class="bloc__entete">
+            <h2 class="bloc__titre">Tags</h2>
+            <button id="btn-gerer-tags" class="bloc__action" type="button">Gérer les tags</button>
+          </div>
+
+          <!-- Tags de type Localisation -->
+          <p class="bloc__sous-titre">📍 Localisation</p>
+          <div id="tags-localisation" class="tags-liste"></div>
+
+          <!-- Tags de type Remarque -->
+          <p class="bloc__sous-titre">⚠️ Remarque</p>
+          <div id="tags-remarque" class="tags-liste"></div>
+        </section>
+
+        <!-- ----- OBSERVATION ----- -->
+        <section class="bloc">
+          <div class="bloc__entete">
+            <h2 class="bloc__titre">Observation</h2>
+            <button id="btn-micro" class="bloc__micro" type="button" aria-label="Dictée vocale">🎤</button>
+          </div>
+          <textarea id="champ-observation" class="champ-observation"
+                    placeholder="Saisissez ou dictez une observation…"></textarea>
+          <p id="micro-etat" class="micro-etat" hidden></p>
+        </section>
+
+      </div>
     </main>
   </section>
 
@@ -222,11 +256,49 @@
     </div>
   </dialog>
 
+  <!-- ================================================================
+       FENÊTRE : gestion des tags du dossier
+       L'opérateur crée ici la liste des tags (Localisation et Remarque)
+       qu'il pourra ensuite cocher sur chaque photo.
+       ================================================================ -->
+  <dialog id="dialogue-tags" class="dialogue dialogue--large">
+    <div class="dialogue__contenu">
+      <h2 class="dialogue__titre">Tags du dossier</h2>
+
+      <!-- Onglets : Localisation / Remarque -->
+      <div class="onglets">
+        <button type="button" class="onglet onglet--actif" data-type="localisation">📍 Localisation</button>
+        <button type="button" class="onglet" data-type="remarque">⚠️ Remarque</button>
+      </div>
+
+      <!-- Ajout d'un nouveau tag -->
+      <div class="ajout-tag">
+        <input id="champ-nouveau-tag" type="text" placeholder="Nom du tag…" autocomplete="off">
+        <button id="btn-ajouter-tag" class="btn btn--principal" type="button">Ajouter</button>
+      </div>
+
+      <!-- Pour les remarques : suggestions de la bibliothèque commune -->
+      <div id="suggestions-remarques" class="suggestions" hidden>
+        <p class="suggestions__titre">Bibliothèque commune (touchez pour ajouter) :</p>
+        <div id="suggestions-liste" class="tags-liste"></div>
+      </div>
+
+      <!-- Liste des tags déjà créés pour ce dossier -->
+      <div id="liste-tags-dossier" class="liste-tags-dossier"></div>
+
+      <div class="dialogue__actions">
+        <button type="button" id="btn-fermer-tags" class="btn btn--principal">Terminé</button>
+      </div>
+    </div>
+  </dialog>
+
   <!-- Les scripts sont chargés dans l'ordre des dépendances :
-       db.js (base de données) → photos.js → dossiers.js → app.js -->
+       db.js → (geo, camera, tags, dictee) → photos → dossiers → app -->
   <script src="js/db.js"></script>
   <script src="js/geo.js"></script>
   <script src="js/camera.js"></script>
+  <script src="js/tags.js"></script>
+  <script src="js/dictee.js"></script>
   <script src="js/photos.js"></script>
   <script src="js/dossiers.js"></script>
   <script src="js/app.js"></script>

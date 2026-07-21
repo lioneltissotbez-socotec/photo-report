@@ -47,10 +47,18 @@ body {
 .ecran { display: none; min-height: 100dvh; flex-direction: column; }
 .ecran--visible { display: flex; }
 
-/* Écrans caméra et photo : hauteur EXACTE de la zone visible (100dvh),
-   surtout pas plus. Ainsi la barre de capture reste toujours à l'écran
-   sans avoir à faire défiler. La zone centrale, elle, se comprime. */
-#ecran-camera.ecran--visible,
+/* Écran caméra : hauteur EXACTE de la zone visible, la barre de capture
+   reste toujours à l'écran. */
+#ecran-camera.ecran--visible {
+  height: 100dvh;
+  min-height: 0;
+  max-height: 100dvh;
+  overflow: hidden;
+}
+
+/* Écran photo : hauteur fixe aussi, mais c'est la zone .fiche-photo à
+   l'intérieur qui défile (pas l'écran entier), pour garder la barre
+   du haut fixe pendant qu'on lit tags et observation. */
 #ecran-photo.ecran--visible {
   height: 100dvh;
   min-height: 0;
@@ -381,27 +389,225 @@ body {
   display: block;
 }
 
-/* --------------------- Visionneuse plein écran ---------------------- */
-/* Fond sombre : les photos ressortent mieux, comme dans une galerie */
+/* --------------------- Fiche photo (écran photo) -------------------- */
 .ecran--sombre { background: #10161C; }
 .ecran--sombre .barre { background: #060A0E; }
 
-.visionneuse {
+/* Zone défilante : image en haut, panneau tags+observation dessous */
+.fiche-photo {
   flex: 1;
-  min-height: 0;   /* même raison : la zone image se comprime au besoin */
+  min-height: 0;
+  overflow-y: auto;           /* défilement pour atteindre l'observation */
+  -webkit-overflow-scrolling: touch;
+}
+
+.fiche-photo__image-cadre {
   display: flex;
   align-items: center;
   justify-content: center;
+  background: #10161C;
   padding: 12px;
-  overflow: hidden;
 }
 
-.visionneuse__image {
+.fiche-photo__image {
   max-width: 100%;
-  max-height: calc(100dvh - 110px); /* toute la hauteur moins la barre */
+  max-height: 55dvh;          /* l'image ne prend pas tout : laisse voir les tags */
   border-radius: 6px;
   object-fit: contain;
 }
+
+/* Panneau clair sous la photo */
+.fiche-photo__panneau {
+  background: var(--fond);
+  border-radius: 18px 18px 0 0;
+  margin-top: -12px;
+  padding: 20px 18px;
+  padding-bottom: calc(28px + env(safe-area-inset-bottom));
+  min-height: 45dvh;
+}
+
+/* Bloc (Tags, Observation) */
+.bloc { margin-bottom: 24px; }
+
+.bloc__entete {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.bloc__titre { font-size: 1.05rem; color: var(--bleu-nuit); font-weight: 800; }
+
+.bloc__action {
+  border: none;
+  background: #E7F0F9;
+  color: var(--bleu-action);
+  font-weight: 700;
+  font-size: 0.85rem;
+  padding: 8px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.bloc__sous-titre {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--encre-douce);
+  margin: 10px 0 6px;
+}
+
+/* Puces de tags (cochables sur la photo) */
+.tags-liste { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.tag-puce {
+  border: 1.5px solid var(--contour);
+  background: var(--carte);
+  color: var(--encre);
+  font-size: 0.9rem;
+  font-family: inherit;
+  padding: 9px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+  min-height: 40px;
+}
+.tag-puce--coche {
+  background: var(--bleu-action);
+  border-color: var(--bleu-action);
+  color: #FFFFFF;
+  font-weight: 700;
+}
+.tag-puce--suggestion {
+  border-style: dashed;
+  color: var(--bleu-action);
+}
+
+.tags-vide { font-size: 0.85rem; color: var(--encre-douce); font-style: italic; }
+
+/* Champ observation + micro */
+.bloc__micro {
+  width: 44px;
+  height: 44px;
+  border: none;
+  border-radius: 50%;
+  background: #E7F0F9;
+  font-size: 1.2rem;
+  cursor: pointer;
+}
+.bloc__micro--actif {
+  background: var(--rouge-danger);
+  animation: pulse-micro 1.2s ease-in-out infinite;
+}
+@keyframes pulse-micro {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(192, 57, 43, 0.4); }
+  50%      { box-shadow: 0 0 0 8px rgba(192, 57, 43, 0); }
+}
+
+.champ-observation {
+  width: 100%;
+  min-height: 110px;
+  padding: 12px 14px;
+  font-size: 1rem;
+  font-family: inherit;
+  line-height: 1.5;
+  border: 1.5px solid var(--contour);
+  border-radius: 12px;
+  background: var(--carte);
+  color: var(--encre);
+  resize: vertical;
+}
+.champ-observation:focus {
+  outline: none;
+  border-color: var(--bleu-action);
+  box-shadow: 0 0 0 3px rgba(11, 92, 171, 0.15);
+}
+
+.micro-etat {
+  font-size: 0.85rem;
+  margin-top: 8px;
+  padding: 8px 12px;
+  border-radius: 8px;
+}
+.micro-etat--ok { color: #1E6B3A; background: #E8F5EC; }
+.micro-etat--erreur { color: var(--rouge-danger); background: #FBEAE8; }
+
+/* --------- Fenêtre de gestion des tags (onglets, suggestions) ------- */
+.dialogue--large { width: min(94vw, 560px); }
+
+.onglets {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  background: #EDF1F6;
+  padding: 4px;
+  border-radius: 12px;
+}
+.onglet {
+  flex: 1;
+  border: none;
+  background: transparent;
+  color: var(--encre-douce);
+  font-weight: 700;
+  font-size: 0.9rem;
+  font-family: inherit;
+  padding: 10px;
+  border-radius: 9px;
+  cursor: pointer;
+}
+.onglet--actif { background: var(--carte); color: var(--bleu-nuit); box-shadow: var(--ombre); }
+
+.ajout-tag { display: flex; gap: 8px; margin-bottom: 16px; }
+.ajout-tag input {
+  flex: 1;
+  min-height: var(--tactile);
+  padding: 10px 14px;
+  font-size: 1rem;
+  font-family: inherit;
+  border: 1.5px solid var(--contour);
+  border-radius: 10px;
+  background: #FAFCFE;
+}
+.ajout-tag input:focus {
+  outline: none;
+  border-color: var(--bleu-action);
+  box-shadow: 0 0 0 3px rgba(11, 92, 171, 0.15);
+}
+
+.suggestions {
+  margin-bottom: 16px;
+  padding: 12px;
+  background: #F7FAFD;
+  border-radius: 10px;
+}
+.suggestions__titre {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--encre-douce);
+  margin-bottom: 8px;
+}
+
+.liste-tags-dossier { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+
+.tag-gestion {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--carte);
+  border: 1.5px solid var(--contour);
+  border-radius: 999px;
+  padding: 8px 8px 8px 14px;
+}
+.tag-gestion__libelle { font-size: 0.9rem; }
+.tag-gestion__suppr {
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 50%;
+  background: #F0F0F0;
+  color: var(--encre-douce);
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+.tag-gestion__suppr:active { background: #FBEAE8; color: var(--rouge-danger); }
 
 /* ====================================================================
    Écran caméra en direct (getUserMedia)

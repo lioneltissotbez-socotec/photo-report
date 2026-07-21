@@ -51,6 +51,8 @@ const App = (() => {
     Dossiers.initialiser();
     Photos.initialiser();
     Camera.initialiser();
+    Tags.initialiser();
+    Dictee.initialiser();
     await Dossiers.afficherListe();
     surveillerReseau();
     enregistrerServiceWorker();

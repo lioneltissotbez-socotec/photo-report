@@ -140,7 +140,7 @@ const Photos = (() => {
   }
 
   /* ------------------------------------------------------------------
-     VISIONNEUSE : affiche une photo en plein écran
+     VISIONNEUSE : affiche une photo, ses tags et son observation
      ------------------------------------------------------------------ */
   function ouvrirPhoto(photo) {
     photoCourante = photo;
@@ -155,6 +155,10 @@ const Photos = (() => {
         hour: '2-digit', minute: '2-digit',
       });
 
+    // Tags cochables (localisation + remarque) et observation existante
+    Tags.afficherTagsPhoto(dossierCourant, photo);
+    document.getElementById('champ-observation').value = photo.observation || '';
+
     App.montrerEcran('ecran-photo');
   }
 
@@ -162,6 +166,7 @@ const Photos = (() => {
      SUPPRESSION d'une photo (avec confirmation)
      ------------------------------------------------------------------ */
   async function confirmerSuppressionPhoto() {
+    Dictee.arreter();
     if (photoCourante) {
       await DB.supprimer('photos', photoCourante.id);
       photoCourante = null;
@@ -192,9 +197,36 @@ const Photos = (() => {
       entreeGalerie.value = '';
     });
 
-    // Visionneuse : retour et suppression
+    // Visionneuse : retour au dossier (en coupant le micro si actif)
     document.getElementById('btn-retour-dossier')
-      .addEventListener('click', () => App.montrerEcran('ecran-dossier'));
+      .addEventListener('click', () => {
+        Dictee.arreter();
+        App.montrerEcran('ecran-dossier');
+      });
+
+    // Bouton "Gérer les tags" : ouvre la fenêtre de gestion, puis
+    // rafraîchit l'affichage des tags de la photo à la fermeture
+    document.getElementById('btn-gerer-tags')
+      .addEventListener('click', () => {
+        Tags.ouvrirGestion(dossierCourant, () => {
+          if (photoCourante) Tags.afficherTagsPhoto(dossierCourant, photoCourante);
+        });
+      });
+
+    // Observation : enregistrement automatique à chaque frappe/dictée.
+    // On attend un court instant après la dernière frappe (anti-rebond)
+    // pour ne pas écrire en base à chaque lettre.
+    const champObs = document.getElementById('champ-observation');
+    let minuteur = null;
+    champObs.addEventListener('input', () => {
+      clearTimeout(minuteur);
+      minuteur = setTimeout(async () => {
+        if (photoCourante) {
+          photoCourante.observation = champObs.value;
+          await DB.enregistrer('photos', photoCourante);
+        }
+      }, 400);
+    });
 
     document.getElementById('btn-supprimer-photo')
       .addEventListener('click', () => dialogueSupprimer.showModal());
